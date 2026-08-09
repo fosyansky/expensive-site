@@ -10,6 +10,8 @@ const state = {
   token: localStorage.getItem('ex_token') || '',
   user: null,
   plan: '30',
+  chatTimer: null,
+  adminTimer: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -49,8 +51,17 @@ function hashView() {
     hwid: 'hwid',
     docs: 'docs',
     documents: 'docs',
+    chat: 'chat',
+    admin: 'admin',
   };
   return map[h] || 'home';
+}
+
+function stopTimers() {
+  if (state.chatTimer) clearInterval(state.chatTimer);
+  if (state.adminTimer) clearInterval(state.adminTimer);
+  state.chatTimer = null;
+  state.adminTimer = null;
 }
 
 function show(view) {
@@ -58,7 +69,20 @@ function show(view) {
   const node = document.getElementById(`view-${view}`);
   if (node) node.classList.remove('hidden');
   window.scrollTo({ top: 0, behavior: 'auto' });
+  stopTimers();
   if (view === 'cabinet') fillCabinet();
+  if (view === 'chat') {
+    refreshChat();
+    state.chatTimer = setInterval(refreshChat, 2500);
+  }
+  if (view === 'admin') {
+    if (!state.user || state.user.role !== 'admin') {
+      location.hash = '#login';
+      return;
+    }
+    refreshAdmin();
+    state.adminTimer = setInterval(refreshAdmin, 4000);
+  }
 }
 
 function route() {
@@ -96,8 +120,11 @@ function renderPrices(containerId, summaryIds) {
 
 function setAuthUi() {
   const on = Boolean(state.user);
+  const isAdmin = on && state.user.role === 'admin';
   $('nav-guest').classList.toggle('hidden', on);
   $('nav-authed').classList.toggle('hidden', !on);
+  $('nav-admin').classList.toggle('hidden', !isAdmin);
+  $('cab-admin').classList.toggle('hidden', !isAdmin);
   if (on) $('nav-login').textContent = state.user.login;
 }
 
@@ -108,6 +135,174 @@ function fillCabinet() {
   }
   $('cab-login').textContent = state.user.login || '—';
   $('cab-email').textContent = state.user.email || '—';
+  $('cab-group').textContent = state.user.role === 'admin' ? 'Администратор' : 'Пользователь';
+  if ($('cab-uid')) $('cab-uid').textContent = state.user.uid != null ? String(state.user.uid) : '—';
+  if (state.user.role === 'admin') $('cab-group').classList.add('admin-tag');
+  else $('cab-group').classList.remove('admin-tag');
+  setupLauncherDownload();
+}
+
+async function setupLauncherDownload() {
+  const a = $('cab-download-launcher');
+  if (!a) return;
+  try {
+    const data = await api('launcher');
+    a.href = data.url;
+    a.setAttribute('download', data.name || 'Expensive-Launcher.exe');
+    a.onclick = null;
+  } catch (e) {
+    a.href = '#';
+    a.onclick = (ev) => {
+      ev.preventDefault();
+      setStatus('cab-status', e.message || 'Ссылка на лаунчер недоступна', 'err');
+    };
+  }
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+}
+
+function formatChatWho(m) {
+  if (m.role === 'admin') {
+    return `<span class="chat-who admin">${escapeHtml(m.login)} // администратор</span>`;
+  }
+  return `<span class="chat-who user">${escapeHtml(m.login)}</span>`;
+}
+
+async function refreshChat() {
+  if (!state.token) {
+    setStatus('chat-status', 'Нужен вход', 'err');
+    return;
+  }
+  try {
+    const data = await api('chat');
+    const box = $('global-chat');
+    box.innerHTML = '';
+    for (const m of data.messages || []) {
+      const div = document.createElement('div');
+      div.className = 'msg';
+      div.innerHTML = `${formatChatWho(m)}${escapeHtml(m.text)}`;
+      box.appendChild(div);
+    }
+    box.scrollTop = box.scrollHeight;
+  } catch (e) {
+    setStatus('chat-status', e.message, 'err');
+  }
+}
+
+async function refreshAdmin() {
+  try {
+    if (state.user) $('admin-who').textContent = state.user.login;
+    const data = await api('admin/users');
+    const online = await api('admin/presence');
+    const box = $('admin-users');
+    box.innerHTML = '';
+    const selected = $('admin-target').value;
+    for (const u of data.users || []) {
+      const row = document.createElement('div');
+      row.className = `admin-row${selected === u.login ? ' selected' : ''}`;
+      const roleLabel = u.role === 'admin' ? '<span class="admin-tag">админ</span>' : 'user';
+      row.innerHTML = `
+        <div>
+          <div><b>${escapeHtml(u.login)}</b> · ${roleLabel}${u.active ? ' · <span style="color:#6ee7b7">online</span>' : ''}</div>
+          <div class="meta">UID сайта: ${u.uid} · баланс ₽${u.balance || 0} · ${u.banned ? 'BANNED' : 'ok'}</div>
+        </div>
+        <div class="acts">
+          <button type="button" data-tgt="${escapeHtml(u.login)}">Выбрать</button>
+        </div>
+      `;
+      box.appendChild(row);
+    }
+    box.querySelectorAll('[data-tgt]').forEach((btn) => {
+      btn.onclick = () => {
+        $('admin-target').value = btn.dataset.tgt;
+        $('admin-target-label').textContent = btn.dataset.tgt;
+        refreshAdmin();
+      };
+    });
+
+    const onBox = $('admin-online');
+    onBox.innerHTML = '';
+    for (const p of online.active || []) {
+      const row = document.createElement('div');
+      row.className = 'admin-row';
+      row.innerHTML = `<div><b>${escapeHtml(p.login)}</b><div class="meta">${escapeHtml(p.server || '—')} · ${escapeHtml(p.version || '')}</div></div>
+        <div class="acts"><button type="button" data-tgt="${escapeHtml(p.login)}">Выбрать</button></div>`;
+      onBox.appendChild(row);
+    }
+    if (!(online.active || []).length) {
+      onBox.innerHTML = '<p class="muted tiny">Никого нет онлайн</p>';
+    }
+    onBox.querySelectorAll('[data-tgt]').forEach((btn) => {
+      btn.onclick = () => {
+        $('admin-target').value = btn.dataset.tgt;
+        $('admin-target-label').textContent = btn.dataset.tgt;
+      };
+    });
+
+    const chatData = await api('chat');
+    const chatBox = $('admin-chat');
+    if (chatBox) {
+      chatBox.innerHTML = '';
+      for (const m of chatData.messages || []) {
+        const div = document.createElement('div');
+        div.className = 'msg';
+        div.innerHTML = `${formatChatWho(m)}${escapeHtml(m.text)}`;
+        chatBox.appendChild(div);
+      }
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+    setStatus('admin-status', `Аккаунтов: ${(data.users || []).length}`, 'ok');
+  } catch (e) {
+    setStatus('admin-status', e.message, 'err');
+  }
+}
+
+async function runAdminAct(act) {
+  const to = $('admin-target').value.trim();
+  if (!to) {
+    setStatus('admin-status', 'Сначала выбери аккаунт слева', 'err');
+    return;
+  }
+  try {
+    if (act === 'ban' || act === 'unban') {
+      await api('admin/ban', { method: 'POST', body: { login: to, banned: act === 'ban' } });
+      setStatus('admin-status', act === 'ban' ? `Бан: ${to}` : `Разбан: ${to}`, 'ok');
+    } else if (act === 'money') {
+      await api('admin/balance', { method: 'POST', body: { login: to, amount: 500 } });
+      setStatus('admin-status', `+500₽ → ${to}`, 'ok');
+    } else if (act === 'setbal') {
+      const balance = Number($('admin-balance-val').value);
+      await api('admin/set-balance', { method: 'POST', body: { login: to, balance } });
+      setStatus('admin-status', `Баланс ${to} = ${balance}₽`, 'ok');
+    } else if (act === 'pass') {
+      const password = String($('admin-pass-val').value || '');
+      await api('admin/reset-password', { method: 'POST', body: { login: to, password } });
+      setStatus('admin-status', `Пароль сброшен: ${to}`, 'ok');
+      $('admin-pass-val').value = '';
+    } else if (act === 'kick') {
+      await api('admin/kick-session', { method: 'POST', body: { login: to } });
+      setStatus('admin-status', `Сессии сброшены + quit: ${to}`, 'ok');
+    } else {
+      await api('admin/command', {
+        method: 'POST',
+        body: {
+          to,
+          type: act,
+          payload: $('admin-cmd-payload').value,
+        },
+      });
+      setStatus('admin-status', `В очередь: ${act} → ${to}`, 'ok');
+    }
+    refreshAdmin();
+  } catch (e) {
+    setStatus('admin-status', e.message, 'err');
+  }
 }
 
 async function refreshMe() {
@@ -140,6 +335,8 @@ document.querySelectorAll('[data-view]').forEach((el) => {
       key: 'key',
       hwid: 'hwid',
       docs: 'docs',
+      chat: 'chat',
+      admin: 'admin',
     };
     const h = hashMap[view] || view;
     if (location.hash !== `#${h}`) location.hash = `#${h}`;
@@ -169,7 +366,7 @@ $('login-form').addEventListener('submit', async (e) => {
     state.user = data.user;
     setAuthUi();
     setStatus('auth-status', `Ок, ${data.user.login}`, 'ok');
-    location.hash = '#cabinet';
+    location.hash = data.user.role === 'admin' ? '#admin' : '#cabinet';
   } catch (err) {
     setStatus('auth-status', err.message, 'err');
   }
@@ -213,6 +410,53 @@ $('btn-hwid').onclick = () => {
   }
   setStatus('hwid-status', 'Запрос на сброс HWID отправлен.', 'ok');
 };
+
+$('global-chat-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!state.token) {
+    location.hash = '#login';
+    return;
+  }
+  const text = $('global-chat-text').value.trim();
+  if (!text) return;
+  try {
+    await api('chat', { method: 'POST', body: { text, source: 'site' } });
+    $('global-chat-text').value = '';
+    refreshChat();
+  } catch (err) {
+    setStatus('chat-status', err.message, 'err');
+  }
+});
+
+$('admin-chat-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const text = $('admin-chat-text').value.trim();
+  if (!text) return;
+  try {
+    await api('chat', { method: 'POST', body: { text, source: 'site' } });
+    $('admin-chat-text').value = '';
+    refreshAdmin();
+  } catch (err) {
+    setStatus('admin-status', err.message, 'err');
+  }
+});
+
+const clearChatBtn = $('admin-clear-chat');
+if (clearChatBtn) {
+  clearChatBtn.addEventListener('click', async () => {
+    try {
+      await api('admin/clear-chat', { method: 'POST', body: {} });
+      setStatus('admin-status', 'Чат очищен', 'ok');
+      refreshAdmin();
+    } catch (err) {
+      setStatus('admin-status', err.message, 'err');
+    }
+  });
+}
+
+document.querySelectorAll('[data-act]').forEach((btn) => {
+  btn.addEventListener('click', () => runAdminAct(btn.getAttribute('data-act')));
+});
 
 window.addEventListener('hashchange', route);
 

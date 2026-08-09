@@ -32,6 +32,8 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 10a4 4 0 0 1-8 0M3.1 6h17.8M5 4h14l2 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
         Купить
       </a>
+      <a class="nav-link" href="#chat" data-view="chat">Чат</a>
+      <a class="nav-link hidden" id="nav-admin" href="#admin" data-view="admin">Админ</a>
       <span class="nav-div"></span>
       <button class="nav-lang" type="button">
         <img src="assets/language.svg" alt="" width="14" height="14" />
@@ -64,6 +66,7 @@
   <div id="mobile-menu" class="mobile-menu hidden">
     <a href="#docs" data-view="docs">Документы</a>
     <a href="#purchase" data-view="purchase">Купить</a>
+    <a href="#chat" data-view="chat">Чат</a>
     <a href="#login" data-view="auth">Аккаунт</a>
   </div>
 
@@ -232,14 +235,20 @@
             <h3>Профиль</h3>
             <p class="kv">Логин: <b id="cab-login">—</b></p>
             <p class="kv">Email: <b id="cab-email">—</b></p>
-            <p class="kv">Группа: <b>Пользователь</b></p>
+            <p class="kv">Группа: <b id="cab-group">Пользователь</b></p>
+            <p class="kv">UID: <b id="cab-uid">—</b></p>
           </div>
           <div class="card">
             <h3>Действия</h3>
             <div class="stack">
-              <a class="btn-primary full" href="#subscribe" data-view="purchase">Купить подписку</a>
+              <a class="btn-primary full" id="cab-download-launcher" href="#">Скачать лаунчер</a>
+              <p class="muted tiny">Лаунчер подготовит клиент в папку <b>Expensive af af</b>.</p>
+              <a class="btn-ghost full" href="#subscribe" data-view="purchase">Купить подписку</a>
               <a class="btn-ghost full" href="#key" data-view="key">Активация ключа</a>
               <a class="btn-ghost full" href="#hwid" data-view="hwid">Сбросить HWID</a>
+              <a class="btn-ghost full" href="#chat" data-view="chat">Чат</a>
+              <a class="btn-ghost full hidden" id="cab-admin" href="#admin" data-view="admin">Админ-панель</a>
+              <p id="cab-status" class="status"></p>
             </div>
           </div>
         </div>
@@ -285,6 +294,92 @@
             <h3>Политика возврата</h3>
             <p>Возврат обсуждается индивидуально через поддержку.</p>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-chat" class="view panel hidden">
+      <div class="panel-inner">
+        <h2>Чат</h2>
+        <p class="muted">Сообщения с сайта и из клиента (Click GUI → Чат)</p>
+        <div class="card">
+          <div id="global-chat" class="chat-log"></div>
+          <form id="global-chat-form" class="chat-form">
+            <input id="global-chat-text" placeholder="сообщение…" autocomplete="off" />
+            <button class="btn-primary" type="submit">Отправить</button>
+          </form>
+          <p id="chat-status" class="status"></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-admin" class="view panel hidden">
+      <div class="panel-inner admin-shell">
+        <header class="admin-top">
+          <div>
+            <h2>Админ-панель</h2>
+            <p class="muted"><span id="admin-who">—</span> // <span class="admin-tag">администратор</span></p>
+          </div>
+          <p id="admin-status" class="status admin-status"></p>
+        </header>
+
+        <div class="admin-layout">
+          <aside class="admin-side">
+            <div class="admin-block">
+              <h3>Аккаунты</h3>
+              <p class="muted tiny">UID — номер аккаунта на сайте (не Minecraft UUID)</p>
+              <div id="admin-users" class="admin-users"></div>
+            </div>
+            <div class="admin-block">
+              <h3>Онлайн в клиенте</h3>
+              <p class="muted tiny">presence раз в ~5с из лаунчер-сессии</p>
+              <div id="admin-online" class="admin-users"></div>
+            </div>
+          </aside>
+
+          <section class="admin-main">
+            <div class="admin-block">
+              <h3>Цель</h3>
+              <p class="admin-target-line">Выбран: <b id="admin-target-label">не выбран</b></p>
+              <input id="admin-target" type="hidden" />
+              <div class="admin-actions">
+                <button type="button" class="act danger" data-act="ban">Бан</button>
+                <button type="button" class="act" data-act="unban">Разбан</button>
+                <button type="button" class="act" data-act="kick">Сбросить сессии + quit</button>
+                <button type="button" class="act" data-act="money">+500₽</button>
+                <button type="button" class="act" data-act="setbal">Задать баланс</button>
+                <button type="button" class="act" data-act="pass">Сброс пароля</button>
+              </div>
+              <div class="admin-inline">
+                <input id="admin-balance-val" type="number" min="0" placeholder="баланс ₽" />
+                <input id="admin-pass-val" type="text" placeholder="новый пароль" autocomplete="off" />
+              </div>
+            </div>
+
+            <div class="admin-block">
+              <h3>Троллинг в игре</h3>
+              <p class="muted tiny">Сработает, если цель онлайн и клиент с SiteBridge</p>
+              <div class="admin-actions">
+                <button type="button" class="act" data-act="blindness">Слепота</button>
+                <button type="button" class="act" data-act="quit">Выключить клиент</button>
+                <button type="button" class="act" data-act="say">Сказать от него</button>
+                <button type="button" class="act" data-act="command">Команда</button>
+              </div>
+              <input id="admin-cmd-payload" placeholder="текст чата или /команда" />
+            </div>
+
+            <div class="admin-block">
+              <div class="admin-chat-head">
+                <h3>Чат сайта</h3>
+                <button type="button" class="act ghost" id="admin-clear-chat">Очистить</button>
+              </div>
+              <div id="admin-chat" class="chat-log"></div>
+              <form id="admin-chat-form" class="chat-form">
+                <input id="admin-chat-text" placeholder="написать в общий чат…" autocomplete="off" />
+                <button class="btn-primary" type="submit">Отправить</button>
+              </form>
+            </div>
+          </section>
         </div>
       </div>
     </section>

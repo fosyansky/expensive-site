@@ -5,8 +5,8 @@ const { v4: uuidv4 } = require('uuid');
 
 const TMP_DB = path.join('/tmp', 'expensive-db.json');
 const LOCAL_DB = path.join(__dirname, '..', '.data', 'db.json');
-const GH_REPO = process.env.GITHUB_DB_REPO || 'fosyansky/expensive-db';
-const GH_PATH = process.env.GITHUB_DB_PATH || 'db.json';
+const GH_REPO = String(process.env.GITHUB_DB_REPO || 'fosyansky/expensive-db').trim();
+const GH_PATH = String(process.env.GITHUB_DB_PATH || 'db.json').trim();
 
 function emptyDb() {
   return {
@@ -19,7 +19,7 @@ function emptyDb() {
 }
 
 function githubToken() {
-  return process.env.GITHUB_TOKEN || process.env.GH_TOKEN || process.env.GITHUB_PAT || '';
+  return String(process.env.GITHUB_TOKEN || process.env.GH_TOKEN || process.env.GITHUB_PAT || '').trim();
 }
 
 function useGithub() {
@@ -172,6 +172,8 @@ function publicUser(u) {
     login: u.login,
     email: u.email,
     role: u.role || 'user',
+    balance: u.balance || 0,
+    banned: Boolean(u.banned),
     registeredAt: u.registeredAt,
   };
 }
