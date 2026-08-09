@@ -355,7 +355,7 @@ async function handler(req, res, forcedPath) {
 
     if (action === 'launcher' && req.method === 'GET') {
       const url = String(process.env.LAUNCHER_DOWNLOAD_URL || '').trim()
-        || 'https://github.com/fosyansky/expensive-site/releases/latest/download/Expensive-Launcher.exe';
+        || 'https://github.com/fosyansky/expensive-site/releases/latest/download/Expensive-Party-Launcher.exe';
       return json(res, 200, { url, name: 'Expensive-Launcher.exe' });
     }
 
