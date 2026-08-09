@@ -3,3 +3,6 @@
 api/.data
 .vercel
 *.log
+.env
+.env.local
+.env.*.local

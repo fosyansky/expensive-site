@@ -1,5 +1,5 @@
 const {
-  loadDb, saveDb, publicUser, authUser, json, readBody, bcrypt, uuidv4, partyCode,
+  loadDb, saveDb, publicUser, authUser, json, readBody, bcrypt, uuidv4, partyCode, dbBackend,
 } = require('./store');
 
 function routeParts(req, forced) {
@@ -24,7 +24,7 @@ async function handler(req, res, forcedPath) {
 
   try {
     if (action === 'health' || (!action && req.method === 'GET')) {
-      return json(res, 200, { ok: true, name: 'expensive' });
+      return json(res, 200, { ok: true, name: 'expensive', db: dbBackend() });
     }
 
     if (action === 'register' && req.method === 'POST') {
@@ -35,7 +35,7 @@ async function handler(req, res, forcedPath) {
       if (!login || !email || password.length < 4) {
         return json(res, 400, { error: 'Заполни логин, email и пароль (мин. 4)' });
       }
-      const db = loadDb();
+      const db = await loadDb();
       if (db.users.some((u) => u.login === login || u.email === email)) {
         return json(res, 409, { error: 'Логин или email уже заняты' });
       }
@@ -50,7 +50,7 @@ async function handler(req, res, forcedPath) {
       db.users.push(user);
       const token = uuidv4();
       db.sessions[token] = login;
-      saveDb(db);
+      await saveDb(db);
       return json(res, 200, { token, user: publicUser(user) });
     }
 
@@ -58,37 +58,37 @@ async function handler(req, res, forcedPath) {
       const body = await readBody(req);
       const identity = String(body.login || body.email || '').trim().toLowerCase();
       const password = String(body.password || '');
-      const db = loadDb();
+      const db = await loadDb();
       const user = db.users.find((u) => u.login === identity || u.email === identity);
       if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
         return json(res, 401, { error: 'Неверный логин или пароль' });
       }
       const token = uuidv4();
       db.sessions[token] = user.login;
-      saveDb(db);
+      await saveDb(db);
       return json(res, 200, { token, user: publicUser(user) });
     }
 
     if (action === 'me' && req.method === 'GET') {
-      const user = authUser(req);
+      const user = await authUser(req);
       if (!user) return json(res, 401, { error: 'Не авторизован' });
       return json(res, 200, { user: publicUser(user) });
     }
 
     if (action === 'logout' && req.method === 'POST') {
-      const db = loadDb();
+      const db = await loadDb();
       const h = req.headers.authorization || '';
       const token = h.startsWith('Bearer ') ? h.slice(7) : '';
       if (token) delete db.sessions[token];
-      saveDb(db);
+      await saveDb(db);
       return json(res, 200, { ok: true });
     }
 
     if (action === 'party' && parts[1] === 'create' && req.method === 'POST') {
-      const user = authUser(req);
+      const user = await authUser(req);
       if (!user) return json(res, 401, { error: 'Войди в аккаунт' });
       const body = await readBody(req);
-      const db = loadDb();
+      const db = await loadDb();
       let code = partyCode();
       while (db.parties[code]) code = partyCode();
       const party = {
@@ -107,16 +107,16 @@ async function handler(req, res, forcedPath) {
         text: `Пати ${party.name} создана. Код: ${code}`,
         at: new Date().toISOString(),
       }];
-      saveDb(db);
+      await saveDb(db);
       return json(res, 200, { party, messages: db.messages[code] });
     }
 
     if (action === 'party' && parts[1] === 'join' && req.method === 'POST') {
-      const user = authUser(req);
+      const user = await authUser(req);
       if (!user) return json(res, 401, { error: 'Войди в аккаунт' });
       const body = await readBody(req);
       const code = String(body.code || '').trim().toUpperCase();
-      const db = loadDb();
+      const db = await loadDb();
       const party = db.parties[code];
       if (!party) return json(res, 404, { error: 'Пати не найдена' });
       if (!party.members.includes(user.login)) {
@@ -128,19 +128,19 @@ async function handler(req, res, forcedPath) {
           text: `${user.login} зашёл в пати`,
           at: new Date().toISOString(),
         });
-        saveDb(db);
+        await saveDb(db);
       }
       return json(res, 200, { party, messages: db.messages[code] || [] });
     }
 
     if (action === 'party' && parts[1] && parts[2] === 'message' && req.method === 'POST') {
-      const user = authUser(req);
+      const user = await authUser(req);
       if (!user) return json(res, 401, { error: 'Войди в аккаунт' });
       const code = String(parts[1]).toUpperCase();
       const body = await readBody(req);
       const text = String(body.text || '').trim().slice(0, 500);
       if (!text) return json(res, 400, { error: 'Пустое сообщение' });
-      const db = loadDb();
+      const db = await loadDb();
       const party = db.parties[code];
       if (!party || !party.members.includes(user.login)) {
         return json(res, 403, { error: 'Нет доступа к пати' });
@@ -156,15 +156,15 @@ async function handler(req, res, forcedPath) {
       if (db.messages[code].length > 200) {
         db.messages[code] = db.messages[code].slice(-200);
       }
-      saveDb(db);
+      await saveDb(db);
       return json(res, 200, { message: msg, messages: db.messages[code] });
     }
 
     if (action === 'party' && parts[1] && req.method === 'GET') {
-      const user = authUser(req);
+      const user = await authUser(req);
       if (!user) return json(res, 401, { error: 'Войди в аккаунт' });
       const code = String(parts[1]).toUpperCase();
-      const db = loadDb();
+      const db = await loadDb();
       const party = db.parties[code];
       if (!party) return json(res, 404, { error: 'Пати не найдена' });
       if (!party.members.includes(user.login)) {

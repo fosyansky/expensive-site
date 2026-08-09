@@ -2,9 +2,21 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
-const api = require('./api/index.js');
 
 const ROOT = __dirname;
+const envFile = path.join(ROOT, '.env');
+if (fs.existsSync(envFile)) {
+  for (const line of fs.readFileSync(envFile, 'utf8').split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t || t.startsWith('#') || !t.includes('=')) continue;
+    const i = t.indexOf('=');
+    const k = t.slice(0, i).trim();
+    const v = t.slice(i + 1).trim();
+    if (k && process.env[k] === undefined) process.env[k] = v;
+  }
+}
+
+const api = require('./api/index.js');
 const PORT = Number(process.env.PORT || 4173);
 
 const MIME = {

@@ -5,18 +5,8 @@ const { v4: uuidv4 } = require('uuid');
 
 const TMP_DB = path.join('/tmp', 'expensive-db.json');
 const LOCAL_DB = path.join(__dirname, '..', '.data', 'db.json');
-
-function dbFile() {
-  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
-    return TMP_DB;
-  }
-  try {
-    fs.mkdirSync(path.dirname(LOCAL_DB), { recursive: true });
-    return LOCAL_DB;
-  } catch (_) {
-    return TMP_DB;
-  }
-}
+const GH_REPO = process.env.GITHUB_DB_REPO || 'fosyansky/expensive-db';
+const GH_PATH = process.env.GITHUB_DB_PATH || 'db.json';
 
 function emptyDb() {
   return {
@@ -28,31 +18,151 @@ function emptyDb() {
   };
 }
 
-let memDb = null;
+function githubToken() {
+  return process.env.GITHUB_TOKEN || process.env.GH_TOKEN || process.env.GITHUB_PAT || '';
+}
 
-function loadDb() {
-  if (memDb) return memDb;
-  const file = dbFile();
+function useGithub() {
+  return Boolean(githubToken());
+}
+
+function localFile() {
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) return TMP_DB;
+  try {
+    fs.mkdirSync(path.dirname(LOCAL_DB), { recursive: true });
+    return LOCAL_DB;
+  } catch (_) {
+    return TMP_DB;
+  }
+}
+
+let cache = { db: null, sha: null, at: 0 };
+
+async function ghFetch(pathname, opts = {}) {
+  const res = await fetch(`https://api.github.com${pathname}`, {
+    ...opts,
+    headers: {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${githubToken()}`,
+      'User-Agent': 'expensive-site',
+      'X-GitHub-Api-Version': '2022-11-28',
+      ...(opts.headers || {}),
+    },
+  });
+  return res;
+}
+
+async function loadDbFromGithub() {
+  const res = await ghFetch(`/repos/${GH_REPO}/contents/${GH_PATH}`);
+  if (res.status === 404) {
+    const db = emptyDb();
+    await saveDbToGithub(db, null);
+    return db;
+  }
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`GitHub DB read ${res.status}: ${t.slice(0, 200)}`);
+  }
+  const data = await res.json();
+  cache.sha = data.sha;
+  const raw = Buffer.from(data.content.replace(/\n/g, ''), 'base64').toString('utf8').replace(/^\uFEFF/, '');
+  const db = JSON.parse(raw || '{}');
+  if (!db.users) db.users = [];
+  if (!db.sessions) db.sessions = {};
+  if (!db.parties) db.parties = {};
+  if (!db.messages) db.messages = {};
+  if (!db.nextUid) db.nextUid = 1;
+  cache.db = db;
+  cache.at = Date.now();
+  return db;
+}
+
+async function saveDbToGithub(db, sha) {
+  const content = Buffer.from(JSON.stringify(db, null, 2), 'utf8').toString('base64');
+  const body = {
+    message: `db sync ${new Date().toISOString()}`,
+    content,
+    branch: process.env.GITHUB_DB_BRANCH || 'main',
+  };
+  if (sha || cache.sha) body.sha = sha || cache.sha;
+
+  let res = await ghFetch(`/repos/${GH_REPO}/contents/${GH_PATH}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (res.status === 409 || res.status === 422) {
+    const meta = await ghFetch(`/repos/${GH_REPO}/contents/${GH_PATH}`);
+    if (meta.ok) {
+      const data = await meta.json();
+      cache.sha = data.sha;
+    }
+    const retryBody = {
+      message: `db sync retry ${new Date().toISOString()}`,
+      content,
+      branch: process.env.GITHUB_DB_BRANCH || 'main',
+      sha: cache.sha,
+    };
+    res = await ghFetch(`/repos/${GH_REPO}/contents/${GH_PATH}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(retryBody),
+    });
+  }
+
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`GitHub DB write ${res.status}: ${t.slice(0, 200)}`);
+  }
+  const data = await res.json();
+  cache.sha = data.content && data.content.sha;
+  cache.db = db;
+  cache.at = Date.now();
+  return db;
+}
+
+function loadDbLocal() {
+  const file = localFile();
   try {
     if (!fs.existsSync(file)) {
       const db = emptyDb();
       fs.writeFileSync(file, JSON.stringify(db, null, 2), 'utf8');
-      memDb = db;
       return db;
     }
-    memDb = JSON.parse(fs.readFileSync(file, 'utf8'));
-    return memDb;
+    const db = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (!db.users) db.users = [];
+    if (!db.sessions) db.sessions = {};
+    if (!db.parties) db.parties = {};
+    if (!db.messages) db.messages = {};
+    if (!db.nextUid) db.nextUid = 1;
+    return db;
   } catch (_) {
-    memDb = emptyDb();
-    return memDb;
+    return emptyDb();
   }
 }
 
-function saveDb(db) {
-  memDb = db;
+function saveDbLocal(db) {
   try {
-    fs.writeFileSync(dbFile(), JSON.stringify(db, null, 2), 'utf8');
+    fs.writeFileSync(localFile(), JSON.stringify(db, null, 2), 'utf8');
   } catch (_) {}
+  return db;
+}
+
+async function loadDb() {
+  if (useGithub()) {
+    if (cache.db && Date.now() - cache.at < 1500) return structuredClone(cache.db);
+    return structuredClone(await loadDbFromGithub());
+  }
+  return loadDbLocal();
+}
+
+async function saveDb(db) {
+  if (useGithub()) {
+    await saveDbToGithub(db, cache.sha);
+    return db;
+  }
+  return saveDbLocal(db);
 }
 
 function publicUser(u) {
@@ -66,11 +176,11 @@ function publicUser(u) {
   };
 }
 
-function authUser(req) {
+async function authUser(req) {
   const h = req.headers.authorization || '';
   const token = h.startsWith('Bearer ') ? h.slice(7) : '';
   if (!token) return null;
-  const db = loadDb();
+  const db = await loadDb();
   const login = db.sessions[token];
   if (!login) return null;
   return db.users.find((u) => u.login === login) || null;
@@ -105,6 +215,10 @@ function partyCode() {
   return out;
 }
 
+function dbBackend() {
+  return useGithub() ? `github:${GH_REPO}` : `file:${localFile()}`;
+}
+
 module.exports = {
   loadDb,
   saveDb,
@@ -115,4 +229,5 @@ module.exports = {
   bcrypt,
   uuidv4,
   partyCode,
+  dbBackend,
 };
