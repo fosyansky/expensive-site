@@ -1,0 +1,6 @@
+node_modules
+api/.data
+.data
+*.log
+assets/newbg.png
+assets/secta.png

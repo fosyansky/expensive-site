@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <meta name="theme-color" content="#09090b" />
+  <title>expensive — Premium DLC</title>
+  <meta name="description" content="Premium Minecraft DLC — the most powerful client on the market." />
+  <link rel="icon" href="assets/explogo.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="preloader" class="preloader">
+    <img src="assets/explogo.svg" alt="" width="48" height="48" />
+  </div>
+
+  <header class="header">
+    <nav class="nav-pill nav-desktop">
+      <a class="nav-logo" href="#home" data-view="home">
+        <img src="assets/explogo.svg" alt="" width="20" height="20" />
+        <span>Expensive</span>
+      </a>
+      <span class="nav-div"></span>
+      <a class="nav-link" href="#docs" data-view="docs">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8l4 4v14a2 2 0 0 1-2 2z"/><path d="M14 2v5h5M10 9H8M16 13H8M16 17H8"/></svg>
+        Документы
+      </a>
+      <a class="nav-link" href="#purchase" data-view="purchase">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 10a4 4 0 0 1-8 0M3.1 6h17.8M5 4h14l2 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+        Купить
+      </a>
+      <span class="nav-div"></span>
+      <button class="nav-lang" type="button">
+        <img src="assets/language.svg" alt="" width="14" height="14" />
+        RU
+      </button>
+      <span class="nav-div"></span>
+      <div class="nav-user" id="nav-guest">
+        <a class="nav-link" href="#login" data-view="auth">Войти</a>
+        <a class="btn-soft" href="#login" data-view="auth">Регистрация</a>
+      </div>
+      <div class="nav-user hidden" id="nav-authed">
+        <a class="nav-link" href="#cabinet" data-view="cabinet">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <span id="nav-login">—</span>
+        </a>
+        <button class="btn-soft" id="btn-logout" type="button" title="Выйти">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m16 17 5-5-5-5M21 12H9M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></svg>
+        </button>
+      </div>
+    </nav>
+    <nav class="nav-pill nav-mobile">
+      <a class="nav-logo" href="#home" data-view="home">
+        <img src="assets/explogo.svg" alt="" width="18" height="18" />
+        <span>Expensive</span>
+      </a>
+      <button class="btn-soft" id="btn-menu" type="button">Меню</button>
+    </nav>
+  </header>
+
+  <div id="mobile-menu" class="mobile-menu hidden">
+    <a href="#docs" data-view="docs">Документы</a>
+    <a href="#purchase" data-view="purchase">Купить</a>
+    <a href="#login" data-view="auth">Аккаунт</a>
+  </div>
+
+  <main>
+    <!-- HOME -->
+    <div id="view-home" class="view">
+      <section class="hero">
+        <div class="hero-glow"></div>
+        <h1><span class="grad">Expensive</span> — простой путь<br />к победе</h1>
+        <p class="lead">Мощный клиент, который не только улучшает ваши игровые навыки, но и позволяет доминировать на любом сервере Minecraft благодаря продвинутым функциям</p>
+        <div class="hero-cta">
+          <a class="btn-primary" href="#purchase" data-view="purchase">Купить продукт <img src="assets/arrow.svg" alt="" width="14" height="14" class="inv" /></a>
+          <a class="btn-ghost" href="#login" data-view="auth">Войти</a>
+        </div>
+        <div class="hero-showcase">
+          <div class="shot side left"><img src="assets/menuthemes.svg" alt="" /></div>
+          <div class="shot main"><img src="assets/mainmenu.svg" alt="" /></div>
+          <div class="shot side right"><img src="assets/configmenu.svg" alt="" /></div>
+          <div class="shot-fade"></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="sec-head">
+          <span class="eyebrow">Почему Expensive?</span>
+          <h2>Мы предоставляем только лучшие функции.</h2>
+          <p class="muted">постоянно растущий функционал с огромным количеством байпасов</p>
+        </div>
+        <div class="feature-split">
+          <div>
+            <h3>буквально лучшая киллаура на рынке.<br /><span class="dim">настолько хороша, что прослезитесь.</span></h3>
+            <hr class="line" />
+            <blockquote>«Это что-то невероятное, что-то новое в мире заезженных читов на Minecraft, я не ожидал такого от этого нового клиента.»</blockquote>
+            <p class="cite-name">Twister</p>
+            <p class="cite-role">Minecraft Ютубер и Медиа</p>
+            <div class="hero-cta tight">
+              <a class="btn-primary sm" href="#purchase" data-view="purchase">Купить продукт <img src="assets/arrow.svg" alt="" width="13" height="13" class="inv" /></a>
+              <a class="btn-ghost sm" href="#login" data-view="auth">Войти</a>
+            </div>
+          </div>
+          <div class="module-card">
+            <div class="chip"><img src="assets/box.svg" alt="" width="13" height="13" /><span>expensive</span></div>
+            <img class="module-img" src="assets/menucomponent.png" alt="Menu component" />
+          </div>
+        </div>
+        <div class="bento">
+          <article class="bento-card">
+            <div class="bento-top"><span>01</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg></div>
+            <h4>Лучшие байпасы на всём рынке</h4>
+            <p>Огромное количество и качество встроенных байпасов точно не оставят вас равнодушными</p>
+          </article>
+          <article class="bento-card">
+            <div class="bento-top"><span>02</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m14.5 17.5-11.5-11.5V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2M14.5 6.5 18 3h3v3l-3.5 3.5M5 14l4 4M7 17l-3 3M3 19l2 2"/></svg></div>
+            <h4>Обилие боевых функций</h4>
+            <p>Мы предоставляем огромную кастомизацию боевых функций, и мы уверены, что с нами вы никогда не проиграете</p>
+          </article>
+          <article class="bento-card">
+            <div class="bento-top"><span>03</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></div>
+            <h4>Красивый и удобный интерфейс</h4>
+            <p>Никаких сложностей и бесконечных поисков функций, мы продумали всё за вас</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section section-bg">
+        <div class="sec-head">
+          <span class="pill">Моментальная настройка</span>
+          <h2>Облачные конфиги</h2>
+          <p class="muted">делитесь конфигурациями с другими, заимствуйте конфиги других игроков. самая удобная система конфигов в expensive</p>
+        </div>
+        <div class="grid-3">
+          <div class="feat"><h4>Fabric API</h4><p>Expensive разработан на базе Fabric API, что открывает широкие возможности для кастомизации клиента модами</p></div>
+          <div class="feat"><h4>Детальная система биндов</h4><p>Наша система клавиш позволяет создать своё «пианино». Переключайте настройки, не отрываясь от игры.</p></div>
+          <div class="feat"><h4>Встроенный чат</h4><p>Общайтесь с пользователями, обменивайтесь информацией, находите команды.</p></div>
+          <div class="feat"><h4>Качественная техподдержка</h4><p>Вы можете рассчитывать на быструю и качественную поддержку.</p></div>
+          <div class="feat"><h4>Точная оптимизация</h4><p>Клиент Expensive работает без лагов даже на слабых системах.</p></div>
+          <div class="feat"><h4>Детальная кастомизация UI</h4><p>Полный контроль над внешним видом интерфейса. Настройте всё под свой стиль.</p></div>
+        </div>
+      </section>
+
+      <section class="section" id="pricing-preview">
+        <div class="sec-head right">
+          <span class="pill">Цены</span>
+          <h2>Простые и прозрачные цены</h2>
+          <p class="muted">Выберите подходящий тариф</p>
+        </div>
+        <div class="price-list" id="price-list-home"></div>
+        <div class="price-summary">
+          <div>
+            <p class="muted tiny" id="sum-label">30 дней</p>
+            <p class="price-big" id="sum-price">429₽</p>
+            <p class="muted tiny" id="sum-day">~14₽ /день</p>
+          </div>
+          <div class="price-side">
+            <ul>
+              <li>Полный функционал</li>
+              <li>Все обновления включены</li>
+              <li>Поддержка 24/7</li>
+            </ul>
+            <a class="btn-primary" href="#purchase" data-view="purchase">Купить сейчас →</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="cta-banner">
+          <h2>Играй по-другому<br /><span>с expensive</span></h2>
+          <p>Попробовав наш клиент, мы можем с уверенностью сказать, что вы больше не подумаете о покупке другого продукта</p>
+          <div class="hero-cta center">
+            <a class="btn-ghost light" href="#login" data-view="auth">Войти</a>
+            <a class="btn-dark" href="#purchase" data-view="purchase">Купить продукт</a>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- AUTH -->
+    <section id="view-auth" class="view panel hidden">
+      <div class="auth-wrap">
+        <div class="auth-card">
+          <img src="assets/explogo.svg" alt="" width="36" height="36" />
+          <h2>Авторизация</h2>
+          <p class="muted">Введите свои данные или создайте аккаунт</p>
+          <form id="login-form" class="stack">
+            <input id="login-id" placeholder="Логин или email" required />
+            <input id="login-pass" type="password" placeholder="Пароль" required />
+            <button class="btn-primary full" type="submit">ВОЙТИ</button>
+          </form>
+          <div class="or">или регистрация</div>
+          <form id="reg-form" class="stack">
+            <input id="reg-login" placeholder="Логин" required />
+            <input id="reg-email" type="email" placeholder="Email" required />
+            <input id="reg-pass" type="password" placeholder="Пароль" required />
+            <button class="btn-ghost full" type="submit">СОЗДАТЬ АККАУНТ</button>
+          </form>
+          <p id="auth-status" class="status"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- PURCHASE -->
+    <section id="view-purchase" class="view panel hidden">
+      <div class="panel-inner">
+        <div class="sec-head right">
+          <span class="pill">Цены</span>
+          <h2>Простые и прозрачные цены</h2>
+        </div>
+        <div class="price-list" id="price-list"></div>
+        <div class="price-summary">
+          <div>
+            <p class="muted tiny" id="buy-label">30 дней</p>
+            <p class="price-big" id="buy-price">429₽</p>
+          </div>
+          <a class="btn-primary" href="#cabinet" data-view="cabinet" id="btn-buy">Купить сейчас →</a>
+        </div>
+        <p id="purchase-status" class="status"></p>
+      </div>
+    </section>
+
+    <!-- CABINET -->
+    <section id="view-cabinet" class="view panel hidden">
+      <div class="panel-inner">
+        <h2>Личный кабинет</h2>
+        <div class="grid-2">
+          <div class="card">
+            <h3>Профиль</h3>
+            <p class="kv">Логин: <b id="cab-login">—</b></p>
+            <p class="kv">Email: <b id="cab-email">—</b></p>
+            <p class="kv">Группа: <b>Пользователь</b></p>
+          </div>
+          <div class="card">
+            <h3>Действия</h3>
+            <div class="stack">
+              <a class="btn-primary full" href="#subscribe" data-view="purchase">Купить подписку</a>
+              <a class="btn-ghost full" href="#key" data-view="key">Активация ключа</a>
+              <a class="btn-ghost full" href="#hwid" data-view="hwid">Сбросить HWID</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- KEY / HWID / DOCS -->
+    <section id="view-key" class="view panel hidden">
+      <div class="panel-inner narrow">
+        <h2>Активация ключа</h2>
+        <form id="key-form" class="card stack">
+          <input id="key-code" placeholder="XXXX-XXXX-XXXX" required />
+          <button class="btn-primary full" type="submit">Активировать</button>
+          <p id="key-status" class="status"></p>
+        </form>
+      </div>
+    </section>
+
+    <section id="view-hwid" class="view panel hidden">
+      <div class="panel-inner narrow">
+        <h2>Сброс HWID</h2>
+        <div class="card stack">
+          <p class="muted">Сброс привязки устройства для входа с нового ПК.</p>
+          <button class="btn-primary full" id="btn-hwid" type="button">Сбросить HWID</button>
+          <p id="hwid-status" class="status"></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-docs" class="view panel hidden">
+      <div class="panel-inner">
+        <h2>Документы</h2>
+        <div class="docs-card">
+          <div class="docs-block">
+            <h3>Пользовательское соглашение</h3>
+            <p>Используя Expensive, вы соглашаетесь с правилами сервиса. Продукт не связан с Mojang/Microsoft.</p>
+          </div>
+          <div class="docs-block">
+            <h3>Политика конфиденциальности</h3>
+            <p>Мы храним логин, email и сессию для авторизации лаунчера и личного кабинета.</p>
+          </div>
+          <div class="docs-block">
+            <h3>Политика возврата</h3>
+            <p>Возврат обсуждается индивидуально через поддержку.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-grid">
+      <div>
+        <a class="nav-logo" href="#home" data-view="home">
+          <img src="assets/explogo.svg" alt="" width="22" height="22" />
+          <span>Expensive</span>
+        </a>
+        <p class="muted tiny">Самый мощный Minecraft клиент на рынке.</p>
+      </div>
+      <div>
+        <span class="foot-label">Продукт</span>
+        <a href="#cabinet" data-view="cabinet">Скачать</a>
+        <a href="#purchase" data-view="purchase">Купить</a>
+        <a href="#login" data-view="auth">Аккаунт</a>
+      </div>
+      <div>
+        <span class="foot-label">Документы</span>
+        <a href="#docs" data-view="docs">Соглашение</a>
+        <a href="#docs" data-view="docs">Конфиденциальность</a>
+        <a href="#docs" data-view="docs">Возврат</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p class="tiny muted">© 2026 – expensive. Все права защищены.</p>
+      <p class="tiny muted">Продукты Expensive Client не связаны с Mojang и Microsoft и не являются официальным продуктом Minecraft.</p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

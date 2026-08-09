@@ -1,0 +1,13 @@
+{
+  "name": "expensive-site",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "uuid": "^11.0.3"
+  }
+}
