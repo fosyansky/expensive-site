@@ -228,13 +228,14 @@ function createLaunchSession(db, user, installation, build) {
     nonce,
     nonceUsedAt: null,
     payloadIssuedAt: null,
+    payloadConsumed: false,
     issuedAt: new Date(now).toISOString(),
     issuedAtMs: now,
     expiresAt: new Date(now + LAUNCH_SESSION_TTL_MS).toISOString(),
     expiresAtMs: now + LAUNCH_SESSION_TTL_MS,
     hardExpiresAtMs: now + LAUNCH_SESSION_HARD_MAX_MS,
     lastSeenAt: new Date(now).toISOString(),
-    status: 'ACTIVE',
+    status: 'AUTHORIZED',
     payloadKeyB64: sessionPayloadKey.toString('base64'),
     manifestVersion: build.manifestVersion || 1,
   };
@@ -250,6 +251,11 @@ function createLaunchSession(db, user, installation, build) {
     expiresAt: session.expiresAt,
   };
   session.attestation = signManifestBody(attestationBody);
+  if (!session.attestation || !session.attestation.signature) {
+    const err = new Error('ATTESTATION_REQUIRED');
+    err.code = 'ATTESTATION_REQUIRED';
+    throw err;
+  }
   db.launchSessions[sessionId] = session;
   return session;
 }
@@ -259,7 +265,10 @@ function revokeLaunchSessionsForLogin(db, login, reason) {
   const now = new Date().toISOString();
   let n = 0;
   for (const s of Object.values(db.launchSessions)) {
-    if (s.login === login && s.status === 'ACTIVE') {
+    if (
+      s.login === login
+      && (s.status === 'ACTIVE' || s.status === 'AUTHORIZED' || s.status === 'PAYLOAD_ISSUED')
+    ) {
       s.status = 'REVOKED';
       s.revokedAt = now;
       s.revokeReason = reason || 'REVOKED';
@@ -276,14 +285,29 @@ function loadBuildEnvelope(channel) {
   return parsed;
 }
 
-function issueSessionPayload(session, build) {
-  if (!session || session.status !== 'ACTIVE') {
+function assertSessionAllowsPayload(session) {
+  if (!session) {
     const err = new Error('INVALID_SESSION');
     err.code = 'INVALID_SESSION';
     throw err;
   }
-  if (session.nonceUsedAt || session.payloadIssuedAt) {
-    const err = new Error('REPLAY');
+  if (session.status === 'REVOKED') {
+    const err = new Error('REVOKED');
+    err.code = 'INVALID_SESSION';
+    throw err;
+  }
+  if (session.status === 'EXPIRED') {
+    const err = new Error('SESSION_EXPIRED');
+    err.code = 'INVALID_SESSION';
+    throw err;
+  }
+  if (session.payloadConsumed || session.payloadIssuedAt || session.nonceUsedAt) {
+    const err = new Error('SESSION_ALREADY_USED');
+    err.code = 'SESSION_ALREADY_USED';
+    throw err;
+  }
+  if (session.status !== 'AUTHORIZED' && session.status !== 'ACTIVE') {
+    const err = new Error('INVALID_SESSION');
     err.code = 'INVALID_SESSION';
     throw err;
   }
@@ -298,6 +322,28 @@ function issueSessionPayload(session, build) {
     session.status = 'EXPIRED';
     const err = new Error('SESSION_EXPIRED');
     err.code = 'INVALID_SESSION';
+    throw err;
+  }
+}
+
+function claimPayloadIssue(session) {
+  assertSessionAllowsPayload(session);
+  const iso = new Date().toISOString();
+  session.nonceUsedAt = iso;
+  session.payloadIssuedAt = iso;
+  session.status = 'PAYLOAD_ISSUED';
+  return session;
+}
+
+function buildSessionBoundPayload(session, build) {
+  if (!session || (session.status !== 'PAYLOAD_ISSUED' && session.status !== 'ACTIVE')) {
+    const err = new Error('INVALID_SESSION');
+    err.code = 'INVALID_SESSION';
+    throw err;
+  }
+  if (session.payloadConsumed) {
+    const err = new Error('SESSION_ALREADY_USED');
+    err.code = 'SESSION_ALREADY_USED';
     throw err;
   }
   const channel = normalizeChannel(session.channel || (build && build.channel) || CHANNEL_STABLE);
@@ -344,9 +390,14 @@ function issueSessionPayload(session, build) {
     ),
   );
   sessionEnvelope.payloadSize = Buffer.byteLength(JSON.stringify(sessionEnvelope));
-  session.nonceUsedAt = new Date().toISOString();
-  session.payloadIssuedAt = session.nonceUsedAt;
+  session.payloadConsumed = true;
+  session.status = 'ACTIVE';
   return sessionEnvelope;
+}
+
+function issueSessionPayload(session, build) {
+  claimPayloadIssue(session);
+  return buildSessionBoundPayload(session, build);
 }
 
 function publicSessionView(session) {
@@ -383,7 +434,7 @@ function getLaunchSession(db, sessionId) {
 function touchLaunchSession(session) {
   session.lastSeenAt = new Date().toISOString();
   const now = Date.now();
-  if (session.status !== 'ACTIVE') return;
+  if (session.status === 'REVOKED' || session.status === 'EXPIRED') return;
   if (session.hardExpiresAtMs && now > session.hardExpiresAtMs) {
     session.status = 'EXPIRED';
     return;
@@ -561,6 +612,9 @@ module.exports = {
   touchLaunchSession,
   revokeLaunchSessionsForLogin,
   issueSessionPayload,
+  claimPayloadIssue,
+  buildSessionBoundPayload,
+  assertSessionAllowsPayload,
   publicSessionView,
   sanitizeSessionForAdmin,
   CHANNEL_STABLE,

@@ -795,12 +795,20 @@ async function handler(req, res, forcedPath) {
         return json(res, 403, prot.fail('INVALID_INSTALLATION', 'Device binding mismatch'));
       }
       for (const s of Object.values(db.launchSessions)) {
-        if (s.installationId === installation.installationId && s.status === 'ACTIVE') {
+        if (s.installationId === installation.installationId && (s.status === 'ACTIVE' || s.status === 'AUTHORIZED' || s.status === 'PAYLOAD_ISSUED')) {
           s.status = 'REVOKED';
           s.revokedAt = new Date().toISOString();
         }
       }
-      const session = prot.createLaunchSession(db, user, installation, build);
+      let session;
+      try {
+        session = prot.createLaunchSession(db, user, installation, build);
+      } catch (e) {
+        return json(res, 500, prot.fail(e.code || 'PROTECTION_FAILURE', e.message || 'session create failed'));
+      }
+      if (!session.attestation || !session.attestation.signature) {
+        return json(res, 500, prot.fail('ATTESTATION_REQUIRED', 'attestation missing'));
+      }
       installation.lastSeenAt = new Date().toISOString();
       installation.launcherVersion = String(body.launcherVersion || installation.launcherVersion || '1.0.0');
       await saveDb(db);
@@ -883,8 +891,14 @@ async function handler(req, res, forcedPath) {
       const db = await loadDb();
       ensureExtras(db);
       const ls = sessionId ? prot.getLaunchSession(db, sessionId) : null;
-      if (!ls || ls.login !== user.login || ls.status !== 'ACTIVE') {
+      if (!ls || ls.login !== user.login) {
         return json(res, 403, prot.fail('INVALID_SESSION', 'Нужна launch session'));
+      }
+      if (ls.status === 'REVOKED' || ls.status === 'EXPIRED') {
+        return json(res, 403, prot.fail('INVALID_SESSION', ls.status));
+      }
+      if (ls.payloadConsumed || ls.payloadIssuedAt || ls.nonceUsedAt) {
+        return json(res, 403, prot.fail('SESSION_ALREADY_USED', 'SESSION_ALREADY_USED'));
       }
       if (prot.normalizeChannel(ls.channel) === prot.CHANNEL_DEVELOPER && user.role !== 'admin') {
         return json(res, 403, prot.fail(
@@ -893,14 +907,16 @@ async function handler(req, res, forcedPath) {
         ));
       }
       prot.touchLaunchSession(ls);
-      if (ls.status !== 'ACTIVE') return json(res, 403, prot.fail('INVALID_SESSION', 'Session истекла'));
+      if (ls.status === 'EXPIRED') return json(res, 403, prot.fail('INVALID_SESSION', 'Session истекла'));
       const channel = prot.normalizeChannel(ls.channel || prot.CHANNEL_STABLE);
       const build = db.builds.find((b) => b.buildId === ls.buildId)
         || prot.ensureDefaultBuild(db, channel);
       if (!build) return json(res, 503, prot.fail('UNSUPPORTED_BUILD', 'Build недоступен'));
       let sessionPayload;
       try {
-        sessionPayload = prot.issueSessionPayload(ls, build);
+        prot.claimPayloadIssue(ls);
+        await saveDb(db);
+        sessionPayload = prot.buildSessionBoundPayload(ls, build);
       } catch (e) {
         prot.pushProtectionEvent(db, {
           login: user.login,
@@ -908,7 +924,7 @@ async function handler(req, res, forcedPath) {
           sessionId: ls.sessionId,
           installationId: ls.installationId,
           buildId: ls.buildId,
-          type: e.code === 'INVALID_SESSION' && String(e.message).includes('REPLAY') ? 'REPLAY' : (e.code || 'CORRUPT_PAYLOAD'),
+          type: e.code === 'SESSION_ALREADY_USED' ? 'REPLAY' : (e.code || 'CORRUPT_PAYLOAD'),
           severity: 'critical',
         });
         await saveDb(db);
@@ -949,6 +965,12 @@ async function handler(req, res, forcedPath) {
       prot.touchLaunchSession(ls);
       if (ls.status === 'REVOKED') return json(res, 200, prot.ok({ status: 'REVOKED', forceClose: true, serverTime: new Date().toISOString() }));
       if (ls.status === 'EXPIRED') return json(res, 200, prot.ok({ status: 'SESSION_EXPIRED', forceClose: true, serverTime: new Date().toISOString() }));
+      if (ls.status === 'AUTHORIZED') {
+        return json(res, 200, prot.ok({ status: 'UNAUTHORIZED_RUNTIME', forceClose: true, serverTime: new Date().toISOString() }));
+      }
+      if (ls.status !== 'ACTIVE' && ls.status !== 'PAYLOAD_ISSUED') {
+        return json(res, 200, prot.ok({ status: 'INVALID_SESSION', forceClose: true, serverTime: new Date().toISOString() }));
+      }
       if (ls.hardExpiresAtMs && Date.now() > ls.hardExpiresAtMs) {
         ls.status = 'EXPIRED';
         await saveDb(db);
