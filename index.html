@@ -315,13 +315,17 @@
     </section>
 
     <section id="view-chat" class="view panel hidden">
-      <div class="panel-inner">
-        <h2>Чат</h2>
-        <p class="muted">Сообщения с сайта и из клиента (Click GUI → Чат)</p>
-        <div class="card">
+      <div class="panel-inner chat-shell">
+        <header class="chat-hero">
+          <div>
+            <h2>Общий чат</h2>
+            <p class="muted">Пишут все пользователи Expensive. Админы выделены отдельно.</p>
+          </div>
+        </header>
+        <div class="chat-panel">
           <div id="global-chat" class="chat-log"></div>
           <form id="global-chat-form" class="chat-form">
-            <input id="global-chat-text" placeholder="сообщение…" autocomplete="off" />
+            <input id="global-chat-text" placeholder="написать всем…" autocomplete="off" maxlength="400" />
             <button class="btn-primary" type="submit">Отправить</button>
           </form>
           <p id="chat-status" class="status"></p>

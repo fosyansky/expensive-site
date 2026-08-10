@@ -190,14 +190,14 @@ function escapeHtml(s) {
 
 function formatChatWho(m) {
   if (m.role === 'admin') {
-    return `<span class="chat-who admin">${escapeHtml(m.login)} // администратор</span>`;
+    return `<span class="chat-who admin"><span class="chat-nick">${escapeHtml(m.login)}</span><span class="chat-role"> // администратор</span></span>`;
   }
   return `<span class="chat-who user">${escapeHtml(m.login)}</span>`;
 }
 
 async function refreshChat() {
   if (!state.token) {
-    setStatus('chat-status', 'Нужен вход', 'err');
+    setStatus('chat-status', 'Войди, чтобы писать в общий чат', 'err');
     return;
   }
   try {
@@ -206,11 +206,15 @@ async function refreshChat() {
     box.innerHTML = '';
     for (const m of data.messages || []) {
       const div = document.createElement('div');
-      div.className = 'msg';
-      div.innerHTML = `${formatChatWho(m)}${escapeHtml(m.text)}`;
+      div.className = `msg${m.role === 'admin' ? ' msg-admin' : ' msg-user'}`;
+      div.innerHTML = `${formatChatWho(m)}<span class="chat-text">${escapeHtml(m.text)}</span>`;
       box.appendChild(div);
     }
+    if (!(data.messages || []).length) {
+      box.innerHTML = '<p class="muted tiny chat-empty">Пока тихо — напиши первым</p>';
+    }
     box.scrollTop = box.scrollHeight;
+    setStatus('chat-status', '', '');
   } catch (e) {
     setStatus('chat-status', e.message, 'err');
   }
@@ -272,8 +276,8 @@ async function refreshAdmin() {
       chatBox.innerHTML = '';
       for (const m of chatData.messages || []) {
         const div = document.createElement('div');
-        div.className = 'msg';
-        div.innerHTML = `${formatChatWho(m)}${escapeHtml(m.text)}`;
+        div.className = `msg${m.role === 'admin' ? ' msg-admin' : ' msg-user'}`;
+        div.innerHTML = `${formatChatWho(m)}<span class="chat-text">${escapeHtml(m.text)}</span>`;
         chatBox.appendChild(div);
       }
       chatBox.scrollTop = chatBox.scrollHeight;

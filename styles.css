@@ -471,9 +471,39 @@ blockquote { color: var(--muted2); font-size: 15px; line-height: 1.6; max-width:
 }
 .admin-inline input:focus, .admin-block > input:focus { border-color: rgba(62,207,142,0.4); }
 .admin-chat-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.chat-who { font-weight: 650; margin-right: 8px; }
-.chat-who.admin { color: var(--danger); }
-.chat-who.user { color: var(--accent2); }
+.chat-who { font-weight: 650; margin-right: 10px; white-space: nowrap; }
+.chat-who.user { color: #9aa3ad; font-weight: 550; }
+.chat-who.admin {
+  color: #ff4d4d;
+  font-weight: 750;
+  text-shadow: 0 0 18px rgba(255, 77, 77, 0.35);
+}
+.chat-who.admin .chat-nick { color: #ff6b6b; }
+.chat-who.admin .chat-role {
+  color: #ff3b3b;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+.chat-text { color: #e8eef2; font-weight: 450; }
+.msg {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 0;
+  padding: 8px 10px; border-radius: 12px; margin-bottom: 6px;
+  line-height: 1.45; font-size: 14px;
+}
+.msg-user { background: rgba(255,255,255,0.02); }
+.msg-admin {
+  background: linear-gradient(90deg, rgba(255,77,77,0.10), rgba(255,77,77,0.02));
+  border: 1px solid rgba(255,77,77,0.18);
+}
+.chat-shell { width: min(860px, calc(100% - 28px)); }
+.chat-hero { margin-bottom: 16px; }
+.chat-hero h2 { font-size: clamp(28px, 4vw, 38px); letter-spacing: -0.03em; }
+.chat-panel {
+  border-radius: 24px; padding: 16px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(16,22,28,0.95), rgba(8,11,14,0.98));
+}
+.chat-empty { padding: 24px 8px; text-align: center; }
 .chat-log {
   height: 300px; overflow: auto; border-radius: 16px;
   border: 1px solid var(--line); background: rgba(0,0,0,0.28);
