@@ -228,26 +228,42 @@
 
     <!-- CABINET -->
     <section id="view-cabinet" class="view panel hidden">
-      <div class="panel-inner">
-        <h2>Личный кабинет</h2>
-        <div class="grid-2">
-          <div class="card">
-            <h3>Профиль</h3>
-            <p class="kv">Логин: <b id="cab-login">—</b></p>
-            <p class="kv">Email: <b id="cab-email">—</b></p>
-            <p class="kv">Группа: <b id="cab-group">Пользователь</b></p>
-            <p class="kv">UID: <b id="cab-uid">—</b></p>
-          </div>
-          <div class="card">
-            <h3>Действия</h3>
-            <div class="stack">
-              <a class="btn-primary full" id="cab-download-launcher" href="#">Скачать лаунчер</a>
-              <p class="muted tiny">Лаунчер подготовит клиент в папку <b>Expensive af af</b>.</p>
-              <a class="btn-ghost full" href="#subscribe" data-view="purchase">Купить подписку</a>
-              <a class="btn-ghost full" href="#key" data-view="key">Активация ключа</a>
-              <a class="btn-ghost full" href="#hwid" data-view="hwid">Сбросить HWID</a>
-              <a class="btn-ghost full" href="#chat" data-view="chat">Чат</a>
-              <a class="btn-ghost full hidden" id="cab-admin" href="#admin" data-view="admin">Админ-панель</a>
+      <div class="panel-inner cab-shell">
+        <div id="cab-ban-overlay" class="ban-stamp-wrap hidden" aria-hidden="true">
+          <div class="ban-stamp">ВЫ ЗАБАНЕНЫ</div>
+          <p class="muted">Доступ к Expensive DLC закрыт администрацией.</p>
+        </div>
+        <div id="cab-content" class="cab-content">
+          <header class="cab-hero">
+            <div class="cab-avatar" id="cab-avatar">E</div>
+            <div>
+              <h2 id="cab-title">Личный кабинет</h2>
+              <p class="muted" id="cab-subline">профиль и загрузка клиента</p>
+            </div>
+            <div class="cab-pill" id="cab-sub-pill">подписка: —</div>
+          </header>
+
+          <div class="cab-grid">
+            <div class="cab-panel">
+              <h3>Профиль</h3>
+              <div class="cab-kv"><span>Логин</span><b id="cab-login">—</b></div>
+              <div class="cab-kv"><span>Email</span><b id="cab-email">—</b></div>
+              <div class="cab-kv"><span>Группа</span><b id="cab-group">Пользователь</b></div>
+              <div class="cab-kv"><span>UID</span><b id="cab-uid">—</b></div>
+              <div class="cab-kv"><span>HWID</span><b id="cab-hwid">не привязан</b></div>
+              <div class="cab-kv"><span>Дней подписки</span><b id="cab-days">—</b></div>
+            </div>
+            <div class="cab-panel">
+              <h3>Клиент</h3>
+              <p class="muted tiny">Лаунчер ставит клиент в папку <b>Expensive af af</b> и проверяет файлы при запуске.</p>
+              <div class="cab-actions">
+                <a class="btn-primary full" id="cab-download-launcher" href="#">Скачать лаунчер</a>
+                <a class="btn-ghost full" href="#subscribe" data-view="purchase">Купить / продлить</a>
+                <a class="btn-ghost full" href="#key" data-view="key">Активация ключа</a>
+                <button class="btn-ghost full" id="cab-reset-hwid" type="button">Сбросить свой HWID</button>
+                <a class="btn-ghost full" href="#chat" data-view="chat">Чат</a>
+                <a class="btn-ghost full hidden" id="cab-admin" href="#admin" data-view="admin">Админ-панель</a>
+              </div>
               <p id="cab-status" class="status"></p>
             </div>
           </div>
@@ -327,12 +343,10 @@
           <aside class="admin-side">
             <div class="admin-block">
               <h3>Аккаунты</h3>
-              <p class="muted tiny">UID — номер аккаунта на сайте (не Minecraft UUID)</p>
               <div id="admin-users" class="admin-users"></div>
             </div>
             <div class="admin-block">
               <h3>Онлайн в клиенте</h3>
-              <p class="muted tiny">presence раз в ~5с из лаунчер-сессии</p>
               <div id="admin-online" class="admin-users"></div>
             </div>
           </aside>
@@ -342,30 +356,33 @@
               <h3>Цель</h3>
               <p class="admin-target-line">Выбран: <b id="admin-target-label">не выбран</b></p>
               <input id="admin-target" type="hidden" />
-              <div class="admin-actions">
-                <button type="button" class="act danger" data-act="ban">Бан</button>
-                <button type="button" class="act" data-act="unban">Разбан</button>
-                <button type="button" class="act" data-act="kick">Сбросить сессии + quit</button>
-                <button type="button" class="act" data-act="money">+500₽</button>
-                <button type="button" class="act" data-act="setbal">Задать баланс</button>
-                <button type="button" class="act" data-act="pass">Сброс пароля</button>
-              </div>
-              <div class="admin-inline">
-                <input id="admin-balance-val" type="number" min="0" placeholder="баланс ₽" />
-                <input id="admin-pass-val" type="text" placeholder="новый пароль" autocomplete="off" />
-              </div>
-            </div>
 
-            <div class="admin-block">
-              <h3>Троллинг в игре</h3>
-              <p class="muted tiny">Сработает, если цель онлайн и клиент с SiteBridge</p>
-              <div class="admin-actions">
-                <button type="button" class="act" data-act="blindness">Слепота</button>
-                <button type="button" class="act" data-act="quit">Выключить клиент</button>
-                <button type="button" class="act" data-act="say">Сказать от него</button>
-                <button type="button" class="act" data-act="command">Команда</button>
+              <div class="admin-ban-card">
+                <div>
+                  <strong>Бан</strong>
+                  <p class="muted tiny">Кик из игры → блок лаунчера → печать в ЛК</p>
+                </div>
+                <div class="admin-actions">
+                  <button type="button" class="act danger" data-act="ban">Забанить</button>
+                  <button type="button" class="act" data-act="unban">Разбанить</button>
+                </div>
               </div>
-              <input id="admin-cmd-payload" placeholder="текст чата или /команда" />
+
+              <div class="admin-actions">
+                <button type="button" class="act" data-act="kick">Закрыть клиент</button>
+                <button type="button" class="act" data-act="resetconfig">Сбросить конфиг</button>
+                <button type="button" class="act" data-act="aspect">Aspect Ratio max</button>
+                <button type="button" class="act" data-act="console">Консоль MC</button>
+                <button type="button" class="act" data-act="grant30">+30 дней сабки</button>
+                <button type="button" class="act" data-act="resethwid">Сброс HWID</button>
+              </div>
+
+              <label class="admin-field-label">Написать в чат от лица цели</label>
+              <p class="muted tiny">Текст → чат. С <b>/</b> или <b>!</b> → команда.</p>
+              <div class="admin-proxy">
+                <input id="admin-cmd-payload" placeholder="привет  /  /kill  /  !help" />
+                <button type="button" class="btn-primary" data-act="proxy">Отправить</button>
+              </div>
             </div>
 
             <div class="admin-block">

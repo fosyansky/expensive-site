@@ -24,7 +24,33 @@ function ensureExtras(db) {
     if (u.balance == null) u.balance = 0;
     if (u.banned == null) u.banned = false;
     if (!u.role) u.role = 'user';
+    if (u.hwid === undefined) u.hwid = null;
+    if (u.subEndsAt === undefined) {
+      u.subEndsAt = u.role === 'admin'
+        ? '9999-12-31T23:59:59.000Z'
+        : null;
+    }
+    if (u.role === 'admin') u.subEndsAt = '9999-12-31T23:59:59.000Z';
   }
+}
+
+function hasActiveSub(user) {
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+  if (!user.subEndsAt) return false;
+  return new Date(user.subEndsAt).getTime() > Date.now();
+}
+
+function daysLeft(user) {
+  if (!user) return 0;
+  if (user.role === 'admin') return 99999;
+  if (!user.subEndsAt) return 0;
+  const ms = new Date(user.subEndsAt).getTime() - Date.now();
+  return Math.max(0, Math.ceil(ms / 86400000));
+}
+
+async function authAny(req) {
+  return authUser(req);
 }
 
 async function requireUser(req) {
@@ -43,6 +69,31 @@ async function requireAdmin(req) {
 function pushChat(db, msg) {
   db.chat.push(msg);
   if (db.chat.length > 500) db.chat = db.chat.slice(-500);
+}
+
+function enqueue(db, to, type, payload, by) {
+  const cmd = {
+    id: uuidv4(),
+    to,
+    type,
+    payload: payload == null ? '' : String(payload).slice(0, 400),
+    by: by || 'system',
+    at: new Date().toISOString(),
+    done: false,
+  };
+  db.commands.push(cmd);
+  if (db.commands.length > 400) db.commands = db.commands.slice(-400);
+  return cmd;
+}
+
+function parseSayPayload(raw) {
+  const text = String(raw || '').trim();
+  if (!text) return null;
+  if (text.startsWith('/') || text.startsWith('!')) {
+    const body = text.replace(/^[\/!]/, '').trim();
+    return { type: 'command', payload: body };
+  }
+  return { type: 'say', payload: text };
 }
 
 async function handler(req, res, forcedPath) {
@@ -77,6 +128,8 @@ async function handler(req, res, forcedPath) {
         role: login === 'human' ? 'admin' : 'user',
         balance: login === 'human' ? 999999 : 0,
         banned: false,
+        hwid: null,
+        subEndsAt: login === 'human' ? '9999-12-31T23:59:59.000Z' : null,
         registeredAt: new Date().toISOString(),
       };
       db.users.push(user);
@@ -90,23 +143,39 @@ async function handler(req, res, forcedPath) {
       const body = await readBody(req);
       const identity = String(body.login || body.email || '').trim().toLowerCase();
       const password = String(body.password || '');
+      const source = String(body.source || 'site').slice(0, 16);
       const db = await loadDb();
       ensureExtras(db);
       const user = db.users.find((u) => u.login === identity || u.email === identity);
       if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
         return json(res, 401, { error: 'Неверный логин или пароль' });
       }
-      if (user.banned) return json(res, 403, { error: 'Аккаунт забанен' });
+      if (user.banned && source === 'launcher') {
+        return json(res, 403, {
+          error: 'Вы были заблокированы в expensive dlc',
+          banned: true,
+          code: 'BANNED',
+        });
+      }
       const token = uuidv4();
       db.sessions[token] = user.login;
       await saveDb(db);
-      return json(res, 200, { token, user: publicUser(user) });
+      return json(res, 200, {
+        token,
+        user: publicUser(user),
+        banned: Boolean(user.banned),
+      });
     }
 
     if (action === 'me' && req.method === 'GET') {
-      const user = await requireUser(req);
+      const user = await authAny(req);
       if (!user) return json(res, 401, { error: 'Не авторизован' });
-      return json(res, 200, { user: publicUser(user) });
+      ensureExtras(await loadDb());
+      return json(res, 200, {
+        user: publicUser(user),
+        hasSub: hasActiveSub(user),
+        daysLeft: daysLeft(user),
+      });
     }
 
     if (action === 'logout' && req.method === 'POST') {
@@ -114,6 +183,39 @@ async function handler(req, res, forcedPath) {
       const h = req.headers.authorization || '';
       const token = h.startsWith('Bearer ') ? h.slice(7) : '';
       if (token) delete db.sessions[token];
+      await saveDb(db);
+      return json(res, 200, { ok: true });
+    }
+
+    if (action === 'hwid' && parts[1] === 'bind' && req.method === 'POST') {
+      const user = await requireUser(req);
+      if (!user) return json(res, 401, { error: 'Не авторизован' });
+      const body = await readBody(req);
+      const hwid = String(body.hwid || '').trim().slice(0, 128);
+      if (!hwid) return json(res, 400, { error: 'Нет HWID' });
+      const db = await loadDb();
+      ensureExtras(db);
+      const u = db.users.find((x) => x.login === user.login);
+      if (!u) return json(res, 404, { error: 'Юзер не найден' });
+      if (u.hwid && u.hwid !== hwid) {
+        return json(res, 403, { error: 'HWID уже привязан к другому устройству. Сбрось в ЛК/у админа.' });
+      }
+      u.hwid = hwid;
+      await saveDb(db);
+      return json(res, 200, { ok: true, user: publicUser(u) });
+    }
+
+    if (action === 'hwid' && parts[1] === 'reset-self' && req.method === 'POST') {
+      const user = await requireUser(req);
+      if (!user) return json(res, 401, { error: 'Не авторизован' });
+      if (!hasActiveSub(user) && user.role !== 'admin') {
+        return json(res, 403, { error: 'Нужна активная подписка' });
+      }
+      const db = await loadDb();
+      ensureExtras(db);
+      const u = db.users.find((x) => x.login === user.login);
+      if (!u) return json(res, 404, { error: 'Юзер не найден' });
+      u.hwid = null;
       await saveDb(db);
       return json(res, 200, { ok: true });
     }
@@ -151,11 +253,31 @@ async function handler(req, res, forcedPath) {
     }
 
     if (action === 'presence' && req.method === 'POST') {
-      const user = await requireUser(req);
+      const user = await authAny(req);
       if (!user) return json(res, 401, { error: 'Не авторизован' });
       const body = await readBody(req);
       const db = await loadDb();
       ensureExtras(db);
+      if (user.banned) {
+        enqueue(db, user.login, 'ban', '', 'system');
+        await saveDb(db);
+        return json(res, 200, {
+          ok: false,
+          banned: true,
+          commands: db.commands.filter((c) => c.to === user.login && !c.done),
+        });
+      }
+      if (!hasActiveSub(user)) {
+        return json(res, 403, { error: 'Нет подписки', code: 'NO_SUB' });
+      }
+      const hwid = String(body.hwid || '').trim().slice(0, 128);
+      const u = db.users.find((x) => x.login === user.login);
+      if (u && hwid) {
+        if (u.hwid && u.hwid !== hwid) {
+          return json(res, 403, { error: 'HWID mismatch', code: 'HWID' });
+        }
+        if (!u.hwid) u.hwid = hwid;
+      }
       db.presence[user.login] = {
         login: user.login,
         role: user.role,
@@ -167,11 +289,16 @@ async function handler(req, res, forcedPath) {
       };
       await saveDb(db);
       const cmds = db.commands.filter((c) => c.to === user.login && !c.done);
-      return json(res, 200, { ok: true, commands: cmds });
+      return json(res, 200, {
+        ok: true,
+        commands: cmds,
+        user: publicUser(u || user),
+        daysLeft: daysLeft(u || user),
+      });
     }
 
     if (action === 'commands' && parts[1] === 'ack' && req.method === 'POST') {
-      const user = await requireUser(req);
+      const user = await authAny(req);
       if (!user) return json(res, 401, { error: 'Не авторизован' });
       const body = await readBody(req);
       const id = String(body.id || '');
@@ -186,6 +313,18 @@ async function handler(req, res, forcedPath) {
       return json(res, 200, { ok: true });
     }
 
+    if (action === 'launcher' && req.method === 'GET') {
+      const user = await authAny(req);
+      if (!user) return json(res, 401, { error: 'Войди в аккаунт' });
+      if (user.banned) return json(res, 403, { error: 'Вы были заблокированы в expensive dlc', banned: true });
+      if (!hasActiveSub(user)) {
+        return json(res, 403, { error: 'Сначала купи подписку', code: 'NO_SUB' });
+      }
+      const url = String(process.env.LAUNCHER_DOWNLOAD_URL || '').trim()
+        || 'https://github.com/fosyansky/expensive-site/releases/latest/download/Expensive-Party-Launcher.exe';
+      return json(res, 200, { url, name: 'Expensive-Launcher.exe' });
+    }
+
     if (action === 'admin' && parts[1] === 'users' && req.method === 'GET') {
       const admin = await requireAdmin(req);
       if (!admin) return json(res, 403, { error: 'Только админ' });
@@ -195,7 +334,13 @@ async function handler(req, res, forcedPath) {
       const users = db.users.map((u) => {
         const p = db.presence[u.login];
         const active = Boolean(p && p.atMs && now - p.atMs < 90000);
-        return { ...publicUser(u), active, presence: active ? p : null };
+        return {
+          ...publicUser(u),
+          active,
+          presence: active ? p : null,
+          hasSub: hasActiveSub(u),
+          daysLeft: daysLeft(u),
+        };
       });
       return json(res, 200, { users });
     }
@@ -216,14 +361,8 @@ async function handler(req, res, forcedPath) {
         for (const [tok, l] of Object.entries(db.sessions)) {
           if (l === login) delete db.sessions[tok];
         }
-        db.commands.push({
-          id: uuidv4(),
-          to: login,
-          type: 'quit',
-          by: admin.login,
-          at: new Date().toISOString(),
-          done: false,
-        });
+        enqueue(db, login, 'ban', '', admin.login);
+        enqueue(db, login, 'quit', '', admin.login);
       }
       await saveDb(db);
       return json(res, 200, { ok: true, user: publicUser(user) });
@@ -245,43 +384,6 @@ async function handler(req, res, forcedPath) {
       return json(res, 200, { ok: true, user: publicUser(user) });
     }
 
-    if (action === 'admin' && parts[1] === 'command' && req.method === 'POST') {
-      const admin = await requireAdmin(req);
-      if (!admin) return json(res, 403, { error: 'Только админ' });
-      const body = await readBody(req);
-      const to = String(body.to || '').trim().toLowerCase();
-      const type = String(body.type || '').trim();
-      const payload = String(body.payload || '').slice(0, 200);
-      const allowed = ['blindness', 'say', 'command', 'quit'];
-      if (!allowed.includes(type)) return json(res, 400, { error: 'Неизвестный тип' });
-      const db = await loadDb();
-      ensureExtras(db);
-      if (!db.users.some((u) => u.login === to)) return json(res, 404, { error: 'Юзер не найден' });
-      const cmd = {
-        id: uuidv4(),
-        to,
-        type,
-        payload,
-        by: admin.login,
-        at: new Date().toISOString(),
-        done: false,
-      };
-      db.commands.push(cmd);
-      if (db.commands.length > 300) db.commands = db.commands.slice(-300);
-      await saveDb(db);
-      return json(res, 200, { ok: true, command: cmd });
-    }
-
-    if (action === 'admin' && parts[1] === 'presence' && req.method === 'GET') {
-      const admin = await requireAdmin(req);
-      if (!admin) return json(res, 403, { error: 'Только админ' });
-      const db = await loadDb();
-      ensureExtras(db);
-      const now = Date.now();
-      const active = Object.values(db.presence).filter((p) => p && p.atMs && now - p.atMs < 90000);
-      return json(res, 200, { active });
-    }
-
     if (action === 'admin' && parts[1] === 'set-balance' && req.method === 'POST') {
       const admin = await requireAdmin(req);
       if (!admin) return json(res, 403, { error: 'Только админ' });
@@ -294,6 +396,38 @@ async function handler(req, res, forcedPath) {
       const user = db.users.find((u) => u.login === login);
       if (!user) return json(res, 404, { error: 'Юзер не найден' });
       user.balance = Math.floor(balance);
+      await saveDb(db);
+      return json(res, 200, { ok: true, user: publicUser(user) });
+    }
+
+    if (action === 'admin' && parts[1] === 'grant-sub' && req.method === 'POST') {
+      const admin = await requireAdmin(req);
+      if (!admin) return json(res, 403, { error: 'Только админ' });
+      const body = await readBody(req);
+      const login = String(body.login || '').trim().toLowerCase();
+      const days = Math.max(1, Math.min(3650, Number(body.days) || 30));
+      const db = await loadDb();
+      ensureExtras(db);
+      const user = db.users.find((u) => u.login === login);
+      if (!user) return json(res, 404, { error: 'Юзер не найден' });
+      const base = user.subEndsAt && new Date(user.subEndsAt).getTime() > Date.now()
+        ? new Date(user.subEndsAt).getTime()
+        : Date.now();
+      user.subEndsAt = new Date(base + days * 86400000).toISOString();
+      await saveDb(db);
+      return json(res, 200, { ok: true, user: publicUser(user), daysLeft: daysLeft(user) });
+    }
+
+    if (action === 'admin' && parts[1] === 'reset-hwid' && req.method === 'POST') {
+      const admin = await requireAdmin(req);
+      if (!admin) return json(res, 403, { error: 'Только админ' });
+      const body = await readBody(req);
+      const login = String(body.login || '').trim().toLowerCase();
+      const db = await loadDb();
+      ensureExtras(db);
+      const user = db.users.find((u) => u.login === login);
+      if (!user) return json(res, 404, { error: 'Юзер не найден' });
+      user.hwid = null;
       await saveDb(db);
       return json(res, 200, { ok: true, user: publicUser(user) });
     }
@@ -312,14 +446,7 @@ async function handler(req, res, forcedPath) {
           n += 1;
         }
       }
-      db.commands.push({
-        id: uuidv4(),
-        to: login,
-        type: 'quit',
-        by: admin.login,
-        at: new Date().toISOString(),
-        done: false,
-      });
+      enqueue(db, login, 'quit', '', admin.login);
       await saveDb(db);
       return json(res, 200, { ok: true, cleared: n });
     }
@@ -353,10 +480,38 @@ async function handler(req, res, forcedPath) {
       return json(res, 200, { ok: true });
     }
 
-    if (action === 'launcher' && req.method === 'GET') {
-      const url = String(process.env.LAUNCHER_DOWNLOAD_URL || '').trim()
-        || 'https://github.com/fosyansky/expensive-site/releases/latest/download/Expensive-Party-Launcher.exe';
-      return json(res, 200, { url, name: 'Expensive-Launcher.exe' });
+    if (action === 'admin' && parts[1] === 'command' && req.method === 'POST') {
+      const admin = await requireAdmin(req);
+      if (!admin) return json(res, 403, { error: 'Только админ' });
+      const body = await readBody(req);
+      const to = String(body.to || '').trim().toLowerCase();
+      let type = String(body.type || '').trim();
+      let payload = String(body.payload || '').slice(0, 400);
+      const allowed = ['blindness', 'say', 'command', 'quit', 'kick', 'resetconfig', 'aspect', 'console', 'ban'];
+      if (type === 'proxy') {
+        const parsed = parseSayPayload(payload);
+        if (!parsed) return json(res, 400, { error: 'Пустой текст' });
+        type = parsed.type;
+        payload = parsed.payload;
+      }
+      if (type === 'kick') type = 'quit';
+      if (!allowed.includes(type)) return json(res, 400, { error: 'Неизвестный тип' });
+      const db = await loadDb();
+      ensureExtras(db);
+      if (!db.users.some((u) => u.login === to)) return json(res, 404, { error: 'Юзер не найден' });
+      const cmd = enqueue(db, to, type, payload, admin.login);
+      await saveDb(db);
+      return json(res, 200, { ok: true, command: cmd });
+    }
+
+    if (action === 'admin' && parts[1] === 'presence' && req.method === 'GET') {
+      const admin = await requireAdmin(req);
+      if (!admin) return json(res, 403, { error: 'Только админ' });
+      const db = await loadDb();
+      ensureExtras(db);
+      const now = Date.now();
+      const active = Object.values(db.presence).filter((p) => p && p.atMs && now - p.atMs < 90000);
+      return json(res, 200, { active });
     }
 
     return json(res, 404, { error: 'Not found', path: parts });
@@ -365,4 +520,4 @@ async function handler(req, res, forcedPath) {
   }
 }
 
-module.exports = { handler };
+module.exports = { handler, hasActiveSub, daysLeft };

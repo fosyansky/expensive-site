@@ -133,13 +133,32 @@ function fillCabinet() {
     location.hash = '#login';
     return;
   }
+  const banned = Boolean(state.user.banned);
+  const overlay = $('cab-ban-overlay');
+  const content = $('cab-content');
+  if (overlay) overlay.classList.toggle('hidden', !banned);
+  if (content) content.classList.toggle('cab-locked', banned);
+
   $('cab-login').textContent = state.user.login || '—';
   $('cab-email').textContent = state.user.email || '—';
   $('cab-group').textContent = state.user.role === 'admin' ? 'Администратор' : 'Пользователь';
   if ($('cab-uid')) $('cab-uid').textContent = state.user.uid != null ? String(state.user.uid) : '—';
+  if ($('cab-hwid')) $('cab-hwid').textContent = state.user.hwidBound ? 'привязан' : 'не привязан';
+  if ($('cab-days')) {
+    $('cab-days').textContent = state.user.role === 'admin'
+      ? '∞'
+      : String(state.user.daysLeft != null ? state.user.daysLeft : 0);
+  }
+  if ($('cab-avatar')) $('cab-avatar').textContent = String(state.user.login || 'E').charAt(0).toUpperCase();
+  if ($('cab-sub-pill')) {
+    if (banned) $('cab-sub-pill').textContent = 'забанен';
+    else if (state.user.role === 'admin') $('cab-sub-pill').textContent = 'подписка: ∞ admin';
+    else if (state.user.hasSub) $('cab-sub-pill').textContent = `подписка: ${state.user.daysLeft} дн.`;
+    else $('cab-sub-pill').textContent = 'подписка: нет';
+  }
   if (state.user.role === 'admin') $('cab-group').classList.add('admin-tag');
   else $('cab-group').classList.remove('admin-tag');
-  setupLauncherDownload();
+  if (!banned) setupLauncherDownload();
 }
 
 async function setupLauncherDownload() {
@@ -149,12 +168,14 @@ async function setupLauncherDownload() {
     const data = await api('launcher');
     a.href = data.url;
     a.setAttribute('download', data.name || 'Expensive-Launcher.exe');
+    a.classList.remove('is-disabled');
     a.onclick = null;
   } catch (e) {
     a.href = '#';
+    a.classList.add('is-disabled');
     a.onclick = (ev) => {
       ev.preventDefault();
-      setStatus('cab-status', e.message || 'Ссылка на лаунчер недоступна', 'err');
+      setStatus('cab-status', e.message || 'Скачивание недоступно', 'err');
     };
   }
 }
@@ -210,7 +231,7 @@ async function refreshAdmin() {
       row.innerHTML = `
         <div>
           <div><b>${escapeHtml(u.login)}</b> · ${roleLabel}${u.active ? ' · <span style="color:#6ee7b7">online</span>' : ''}</div>
-          <div class="meta">UID сайта: ${u.uid} · баланс ₽${u.balance || 0} · ${u.banned ? 'BANNED' : 'ok'}</div>
+          <div class="meta">UID ${u.uid} · ${u.hasSub ? `${u.daysLeft}д` : 'нет сабки'} · ₽${u.balance || 0} · ${u.banned ? 'BANNED' : 'ok'}${u.hwidBound ? ' · HWID' : ''}</div>
         </div>
         <div class="acts">
           <button type="button" data-tgt="${escapeHtml(u.login)}">Выбрать</button>
@@ -273,29 +294,27 @@ async function runAdminAct(act) {
     if (act === 'ban' || act === 'unban') {
       await api('admin/ban', { method: 'POST', body: { login: to, banned: act === 'ban' } });
       setStatus('admin-status', act === 'ban' ? `Бан: ${to}` : `Разбан: ${to}`, 'ok');
-    } else if (act === 'money') {
-      await api('admin/balance', { method: 'POST', body: { login: to, amount: 500 } });
-      setStatus('admin-status', `+500₽ → ${to}`, 'ok');
-    } else if (act === 'setbal') {
-      const balance = Number($('admin-balance-val').value);
-      await api('admin/set-balance', { method: 'POST', body: { login: to, balance } });
-      setStatus('admin-status', `Баланс ${to} = ${balance}₽`, 'ok');
-    } else if (act === 'pass') {
-      const password = String($('admin-pass-val').value || '');
-      await api('admin/reset-password', { method: 'POST', body: { login: to, password } });
-      setStatus('admin-status', `Пароль сброшен: ${to}`, 'ok');
-      $('admin-pass-val').value = '';
+    } else if (act === 'grant30') {
+      await api('admin/grant-sub', { method: 'POST', body: { login: to, days: 30 } });
+      setStatus('admin-status', `+30 дней → ${to}`, 'ok');
+    } else if (act === 'resethwid') {
+      await api('admin/reset-hwid', { method: 'POST', body: { login: to } });
+      setStatus('admin-status', `HWID сброшен: ${to}`, 'ok');
     } else if (act === 'kick') {
-      await api('admin/kick-session', { method: 'POST', body: { login: to } });
-      setStatus('admin-status', `Сессии сброшены + quit: ${to}`, 'ok');
+      await api('admin/command', { method: 'POST', body: { to, type: 'quit', payload: '' } });
+      setStatus('admin-status', `Закрыть клиент → ${to}`, 'ok');
+    } else if (act === 'proxy') {
+      const payload = $('admin-cmd-payload').value;
+      await api('admin/command', { method: 'POST', body: { to, type: 'proxy', payload } });
+      setStatus('admin-status', `От лица ${to}: отправлено`, 'ok');
+      $('admin-cmd-payload').value = '';
+    } else if (act === 'resetconfig' || act === 'aspect' || act === 'console') {
+      await api('admin/command', { method: 'POST', body: { to, type: act, payload: act === 'aspect' ? '4:3' : '' } });
+      setStatus('admin-status', `${act} → ${to}`, 'ok');
     } else {
       await api('admin/command', {
         method: 'POST',
-        body: {
-          to,
-          type: act,
-          payload: $('admin-cmd-payload').value,
-        },
+        body: { to, type: act, payload: $('admin-cmd-payload') ? $('admin-cmd-payload').value : '' },
       });
       setStatus('admin-status', `В очередь: ${act} → ${to}`, 'ok');
     }
@@ -314,8 +333,14 @@ async function refreshMe() {
   try {
     const data = await api('me');
     state.user = data.user;
+    if (data.user) {
+      state.user.hasSub = data.hasSub != null ? data.hasSub : data.user.hasSub;
+      state.user.daysLeft = data.daysLeft != null ? data.daysLeft : data.user.daysLeft;
+    }
     setAuthUi();
-    setStatus('auth-status', `Ты вошёл как ${data.user.login}`, 'ok');
+    setStatus('auth-status', data.user.banned
+      ? 'Аккаунт заблокирован'
+      : `Ты вошёл как ${data.user.login}`, data.user.banned ? 'err' : 'ok');
   } catch (_) {
     state.token = '';
     localStorage.removeItem('ex_token');
@@ -403,13 +428,32 @@ $('key-form').addEventListener('submit', (e) => {
   setStatus('key-status', 'Ключ принят (локально). Оплата/валидация — через кабинет.', 'ok');
 });
 
-$('btn-hwid').onclick = () => {
+$('btn-hwid').onclick = async () => {
   if (!state.token) {
     location.hash = '#login';
     return;
   }
-  setStatus('hwid-status', 'Запрос на сброс HWID отправлен.', 'ok');
+  try {
+    await api('hwid/reset-self', { method: 'POST', body: {} });
+    setStatus('hwid-status', 'HWID сброшен', 'ok');
+    refreshMe();
+  } catch (e) {
+    setStatus('hwid-status', e.message, 'err');
+  }
 };
+
+const cabResetHwid = $('cab-reset-hwid');
+if (cabResetHwid) {
+  cabResetHwid.onclick = async () => {
+    try {
+      await api('hwid/reset-self', { method: 'POST', body: {} });
+      setStatus('cab-status', 'HWID сброшен', 'ok');
+      refreshMe().then(fillCabinet);
+    } catch (e) {
+      setStatus('cab-status', e.message, 'err');
+    }
+  };
+}
 
 $('global-chat-form').addEventListener('submit', async (e) => {
   e.preventDefault();

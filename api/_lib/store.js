@@ -167,13 +167,25 @@ async function saveDb(db) {
 
 function publicUser(u) {
   if (!u) return null;
+  const role = u.role || 'user';
+  const banned = Boolean(u.banned);
+  const subEndsAt = role === 'admin' ? '9999-12-31T23:59:59.000Z' : (u.subEndsAt || null);
+  const hasSub = role === 'admin' || (subEndsAt && new Date(subEndsAt).getTime() > Date.now());
+  const daysLeft = role === 'admin'
+    ? 99999
+    : (subEndsAt ? Math.max(0, Math.ceil((new Date(subEndsAt).getTime() - Date.now()) / 86400000)) : 0);
   return {
     uid: u.uid,
     login: u.login,
     email: u.email,
-    role: u.role || 'user',
+    role,
     balance: u.balance || 0,
-    banned: Boolean(u.banned),
+    banned,
+    hwid: u.hwid || null,
+    hwidBound: Boolean(u.hwid),
+    subEndsAt,
+    hasSub,
+    daysLeft,
     registeredAt: u.registeredAt,
   };
 }
