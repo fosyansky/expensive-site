@@ -336,140 +336,108 @@
     <section id="view-admin" class="view panel hidden">
       <div class="panel-inner admin-shell">
         <header class="admin-hero">
-          <div>
-            <p class="admin-kicker">CONTROL ROOM</p>
-            <h2>Админ-панель</h2>
-            <p class="muted">Вошёл: <b id="admin-who">—</b> · <span class="admin-tag">администратор</span></p>
+          <div class="admin-hero-text">
+            <p class="admin-kicker">Админка</p>
+            <h2>Управление</h2>
+            <p class="muted tiny">Вы вошли как <b id="admin-who">—</b></p>
           </div>
-          <p id="admin-status" class="status admin-status"></p>
+          <div id="admin-status" class="admin-toast" role="status"></div>
         </header>
 
-        <div class="admin-grid-top">
-          <article class="admin-card admin-card-release">
-            <div class="admin-card-head">
-              <span class="admin-num">01</span>
-              <div>
-                <h3>Релиз клиента</h3>
-                <p class="muted tiny">Сначала сборка уходит в Developer -v. Когда готово — заливай в публичную BETA.</p>
-              </div>
-            </div>
-            <div class="admin-flow">
-              <span class="admin-pill">Developer -v</span>
-              <span class="admin-arrow">→</span>
-              <span class="admin-pill accent">Fabric 1.21.11 BETA</span>
-            </div>
-            <button type="button" class="admin-btn admin-btn-xl" id="btn-promote-dev">
-              Залить апдейт с Developer в BETA
-            </button>
-            <button type="button" class="admin-btn admin-btn-ghost" id="btn-prot-events">Protection events</button>
-          </article>
-
-          <article class="admin-card admin-card-keys">
-            <div class="admin-card-head">
-              <span class="admin-num">02</span>
-              <div>
-                <h3>Ключи подписки</h3>
-                <p class="muted tiny">Введи дни → получи ключ. После активации игроком ключ сам стирается из базы.</p>
-              </div>
-            </div>
-            <div class="admin-key-form">
-              <label>
-                <span>Дней</span>
-                <input id="admin-key-days" type="number" min="1" max="3650" value="30" />
-              </label>
-              <button type="button" class="admin-btn admin-btn-primary" id="btn-gen-key">Сгенерировать ключ</button>
-            </div>
-            <p id="admin-key-result" class="status admin-key-out"></p>
-            <div id="admin-keys-list" class="admin-keys-list"></div>
-          </article>
-        </div>
-
-        <div class="admin-layout">
-          <aside class="admin-side">
+        <div class="admin-stack">
+          <div class="admin-duo">
             <article class="admin-card">
-              <div class="admin-card-head">
-                <span class="admin-num">03</span>
-                <div>
-                  <h3>Игроки</h3>
-                  <p class="muted tiny">Кликни «Выбрать» — справа появятся действия для этого аккаунта.</p>
-                </div>
+              <h3 class="admin-card-title">Релиз</h3>
+              <p class="admin-card-desc">Developer → публичная BETA для всех игроков</p>
+              <div class="admin-btn-grid">
+                <button type="button" class="admin-btn" id="btn-promote-dev">Залить Developer → BETA</button>
+                <button type="button" class="admin-btn" id="btn-prot-events">Protection events</button>
               </div>
-              <div id="admin-users" class="admin-users"></div>
             </article>
-            <article class="admin-card">
-              <h3>Онлайн сейчас</h3>
-              <div id="admin-online" class="admin-users admin-users-sm"></div>
-            </article>
-          </aside>
 
-          <section class="admin-main">
-            <article class="admin-card admin-card-target">
+            <article class="admin-card">
+              <h3 class="admin-card-title">Ключи подписки</h3>
+              <p class="admin-card-desc">После активации ключ удаляется из базы</p>
+              <div class="admin-key-row">
+                <input id="admin-key-days" type="number" min="1" max="3650" value="30" aria-label="Дней" />
+                <button type="button" class="admin-btn" id="btn-gen-key">Сгенерировать</button>
+              </div>
+              <p id="admin-key-result" class="admin-key-out"></p>
+              <div id="admin-keys-list" class="admin-list"></div>
+            </article>
+          </div>
+
+          <div class="admin-trio">
+            <article class="admin-card admin-card-list">
+              <div class="admin-card-title-row">
+                <h3 class="admin-card-title">Все пользователи</h3>
+                <span class="admin-count" id="admin-users-count">0</span>
+              </div>
+              <div id="admin-users" class="admin-list admin-list-scroll"></div>
+            </article>
+
+            <article class="admin-card admin-card-list">
+              <div class="admin-card-title-row">
+                <h3 class="admin-card-title">Онлайн</h3>
+                <span class="admin-count online" id="admin-online-count">0</span>
+              </div>
+              <div id="admin-online" class="admin-list admin-list-scroll"></div>
+            </article>
+
+            <article class="admin-card admin-card-actions">
               <div class="admin-target-bar">
-                <div>
-                  <p class="admin-kicker">ЦЕЛЬ</p>
-                  <p class="admin-target-name" id="admin-target-label">не выбран</p>
-                </div>
+                <span class="admin-kicker">Выбран</span>
+                <strong id="admin-target-label">никого</strong>
                 <input id="admin-target" type="hidden" />
               </div>
 
-              <div class="admin-section">
-                <h4>Роли</h4>
-                <div class="admin-btn-row">
-                  <button type="button" class="admin-btn admin-btn-primary" data-act="grantadmin">Выдать админку</button>
-                  <button type="button" class="admin-btn admin-btn-danger" data-act="revokeadmin">Снять админку</button>
-                </div>
+              <p class="admin-group-label">Роли</p>
+              <div class="admin-btn-grid">
+                <button type="button" class="admin-btn" data-act="grantadmin">Выдать админку</button>
+                <button type="button" class="admin-btn" data-act="revokeadmin">Снять админку</button>
               </div>
 
-              <div class="admin-section">
-                <h4>Подписка</h4>
-                <div class="admin-btn-row">
-                  <button type="button" class="admin-btn" data-act="grant30">+30 дней подписки</button>
-                </div>
+              <p class="admin-group-label">Подписка</p>
+              <div class="admin-btn-grid">
+                <button type="button" class="admin-btn" data-act="grant30">+30 дней</button>
               </div>
 
-              <div class="admin-section">
-                <h4>Модерация</h4>
-                <div class="admin-btn-row">
-                  <button type="button" class="admin-btn admin-btn-danger" data-act="ban">Забанить</button>
-                  <button type="button" class="admin-btn" data-act="unban">Разбанить</button>
-                  <button type="button" class="admin-btn" data-act="kick">Закрыть клиент</button>
-                </div>
+              <p class="admin-group-label">Модерация</p>
+              <div class="admin-btn-grid">
+                <button type="button" class="admin-btn" data-act="ban">Забанить</button>
+                <button type="button" class="admin-btn" data-act="unban">Разбанить</button>
+                <button type="button" class="admin-btn" data-act="kick">Закрыть клиент</button>
               </div>
 
-              <div class="admin-section">
-                <h4>Техника</h4>
-                <div class="admin-btn-row">
-                  <button type="button" class="admin-btn" data-act="resethwid">Сброс HWID</button>
-                  <button type="button" class="admin-btn" data-act="resetconfig">Сброс конфига</button>
-                  <button type="button" class="admin-btn" data-act="aspect">Aspect 4:3</button>
-                  <button type="button" class="admin-btn" data-act="console">Консоль MC</button>
-                  <button type="button" class="admin-btn admin-btn-danger" data-act="resetinstallation">Сброс installation</button>
-                  <button type="button" class="admin-btn admin-btn-danger" data-act="revokeallsessions">Отозвать сессии</button>
-                </div>
+              <p class="admin-group-label">Техника</p>
+              <div class="admin-btn-grid">
+                <button type="button" class="admin-btn" data-act="resethwid">Сброс HWID</button>
+                <button type="button" class="admin-btn" data-act="resetconfig">Сброс конфига</button>
+                <button type="button" class="admin-btn" data-act="aspect">Aspect 4:3</button>
+                <button type="button" class="admin-btn" data-act="console">Консоль MC</button>
+                <button type="button" class="admin-btn" data-act="resetinstallation">Сброс installation</button>
+                <button type="button" class="admin-btn" data-act="revokeallsessions">Отозвать сессии</button>
               </div>
 
-              <div class="admin-section">
-                <h4>Написать от лица цели</h4>
-                <p class="muted tiny">Текст → чат. С / или ! → команда в клиенте.</p>
-                <div class="admin-proxy">
-                  <input id="admin-cmd-payload" placeholder="привет  /  /kill  /  !help" />
-                  <button type="button" class="admin-btn admin-btn-primary" data-act="proxy">Отправить</button>
-                </div>
+              <p class="admin-group-label">От лица игрока</p>
+              <div class="admin-proxy">
+                <input id="admin-cmd-payload" placeholder="текст или /команда" />
+                <button type="button" class="admin-btn" data-act="proxy">Отправить</button>
               </div>
             </article>
+          </div>
 
-            <article class="admin-card">
-              <div class="admin-chat-head">
-                <h3>Чат сайта</h3>
-                <button type="button" class="admin-btn admin-btn-ghost" id="admin-clear-chat">Очистить</button>
-              </div>
-              <div id="admin-chat" class="chat-log"></div>
-              <form id="admin-chat-form" class="chat-form">
-                <input id="admin-chat-text" placeholder="написать в общий чат…" autocomplete="off" />
-                <button class="admin-btn admin-btn-primary" type="submit">Отправить</button>
-              </form>
-            </article>
-          </section>
+          <article class="admin-card">
+            <div class="admin-card-title-row">
+              <h3 class="admin-card-title">Чат сайта</h3>
+              <button type="button" class="admin-btn admin-btn-compact" id="admin-clear-chat">Очистить</button>
+            </div>
+            <div id="admin-chat" class="chat-log admin-chat-log"></div>
+            <form id="admin-chat-form" class="admin-proxy">
+              <input id="admin-chat-text" placeholder="написать в общий чат…" autocomplete="off" />
+              <button class="admin-btn" type="submit">Отправить</button>
+            </form>
+          </article>
         </div>
       </div>
     </section>

@@ -20,7 +20,135 @@ function setStatus(id, text, kind) {
   const el = $(id);
   if (!el) return;
   el.textContent = text || '';
+  if (id === 'admin-status' || id === 'admin-key-result') {
+    el.className = id === 'admin-status' ? `admin-toast${kind ? ` ${kind}` : ''}` : `admin-key-out${kind ? ` ${kind}` : ''}`;
+    return;
+  }
   el.className = `status${kind ? ` ${kind}` : ''}`;
+}
+
+function selectAdminTarget(login) {
+  if (!login) return;
+  $('admin-target').value = login;
+  $('admin-target-label').textContent = login;
+  document.querySelectorAll('.admin-user').forEach((el) => {
+    el.classList.toggle('is-selected', el.dataset.tgt === login);
+  });
+}
+
+function renderAdminUserButton(u, selected) {
+  const online = Boolean(u.active || u.online);
+  const badges = [];
+  if (u.role === 'admin') badges.push('<span class="admin-badge admin">админ</span>');
+  if (u.banned) badges.push('<span class="admin-badge ban">бан</span>');
+  if (online) badges.push('<span class="admin-badge live">online</span>');
+  const meta = u.meta
+    || `UID ${u.uid ?? '—'} · ${u.hasSub ? `${u.daysLeft}д` : 'нет сабки'} · ₽${u.balance || 0}${u.hwidBound ? ' · HWID' : ''}`;
+  return `
+    <button type="button" class="admin-user${selected === u.login ? ' is-selected' : ''}" data-tgt="${escapeHtml(u.login)}">
+      <span class="admin-user-dot${online ? ' on' : ''}" aria-hidden="true"></span>
+      <span class="admin-user-body">
+        <span class="admin-user-name"><b>${escapeHtml(u.login)}</b>${badges.join('')}</span>
+        <span class="admin-user-meta">${escapeHtml(meta)}</span>
+      </span>
+    </button>
+  `;
+}
+
+async function refreshAdmin() {
+  try {
+    const usersBox = $('admin-users');
+    const onlineBox = $('admin-online');
+    const usersScroll = usersBox ? usersBox.scrollTop : 0;
+    const onlineScroll = onlineBox ? onlineBox.scrollTop : 0;
+    if (state.user) $('admin-who').textContent = state.user.login;
+    const data = await api('admin/users');
+    const online = await api('admin/presence');
+    const selected = $('admin-target').value;
+    const users = data.users || [];
+    const active = online.active || [];
+
+    if (usersBox) {
+      usersBox.innerHTML = users.length
+        ? users.map((u) => renderAdminUserButton(u, selected)).join('')
+        : '<p class="admin-empty">Пользователей нет</p>';
+      usersBox.scrollTop = usersScroll;
+      usersBox.querySelectorAll('[data-tgt]').forEach((btn) => {
+        btn.onclick = () => selectAdminTarget(btn.dataset.tgt);
+      });
+    }
+    if ($('admin-users-count')) $('admin-users-count').textContent = String(users.length);
+
+    if (onlineBox) {
+      if (!active.length) {
+        onlineBox.innerHTML = '<p class="admin-empty">Сейчас никто не в клиенте</p>';
+      } else {
+        onlineBox.innerHTML = active.map((p) => renderAdminUserButton({
+          login: p.login,
+          online: true,
+          active: true,
+          meta: `${p.server || '—'} · ${p.version || 'client'}`,
+        }, selected)).join('');
+      }
+      onlineBox.scrollTop = onlineScroll;
+      onlineBox.querySelectorAll('[data-tgt]').forEach((btn) => {
+        btn.onclick = () => selectAdminTarget(btn.dataset.tgt);
+      });
+    }
+    if ($('admin-online-count')) $('admin-online-count').textContent = String(active.length);
+
+    const chatData = await api('chat');
+    const chatBox = $('admin-chat');
+    if (chatBox) {
+      const stick = chatBox.scrollTop + chatBox.clientHeight >= chatBox.scrollHeight - 40;
+      chatBox.innerHTML = '';
+      for (const m of chatData.messages || []) {
+        const div = document.createElement('div');
+        div.className = `msg${m.role === 'admin' ? ' msg-admin' : ' msg-user'}`;
+        div.innerHTML = `${formatChatWho(m)}<span class="chat-text">${escapeHtml(m.text)}</span>`;
+        chatBox.appendChild(div);
+      }
+      if (stick) chatBox.scrollTop = chatBox.scrollHeight;
+    }
+    await refreshAdminKeys();
+    setStatus('admin-status', `Готово · аккаунтов ${users.length} · онлайн ${active.length}`, 'ok');
+  } catch (e) {
+    setStatus('admin-status', e.message, 'err');
+  }
+}
+
+async function refreshAdminKeys() {
+  const box = $('admin-keys-list');
+  if (!box) return;
+  try {
+    const data = await api('admin/list-keys');
+    const keys = data.keys || [];
+    if (!keys.length) {
+      box.innerHTML = '<p class="admin-empty">Нет неиспользованных ключей</p>';
+      return;
+    }
+    box.innerHTML = keys.map((k) => `
+      <button type="button" class="admin-user" data-copy="${escapeHtml(k.code)}">
+        <span class="admin-user-body">
+          <span class="admin-user-name"><b class="mono">${escapeHtml(k.code)}</b></span>
+          <span class="admin-user-meta">${k.days}д · ${escapeHtml(k.createdBy || '')}</span>
+        </span>
+        <span class="admin-badge">copy</span>
+      </button>
+    `).join('');
+    box.querySelectorAll('[data-copy]').forEach((btn) => {
+      btn.onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(btn.dataset.copy);
+          setStatus('admin-key-result', `Скопировано: ${btn.dataset.copy}`, 'ok');
+        } catch (_) {
+          setStatus('admin-key-result', btn.dataset.copy, 'ok');
+        }
+      };
+    });
+  } catch (e) {
+    box.innerHTML = `<p class="admin-empty">${escapeHtml(e.message)}</p>`;
+  }
 }
 
 async function api(path, opts = {}) {
@@ -220,112 +348,10 @@ async function refreshChat() {
   }
 }
 
-async function refreshAdmin() {
-  try {
-    if (state.user) $('admin-who').textContent = state.user.login;
-    const data = await api('admin/users');
-    const online = await api('admin/presence');
-    const box = $('admin-users');
-    box.innerHTML = '';
-    const selected = $('admin-target').value;
-    for (const u of data.users || []) {
-      const row = document.createElement('div');
-      row.className = `admin-row${selected === u.login ? ' selected' : ''}`;
-      const roleLabel = u.role === 'admin' ? '<span class="admin-tag">админ</span>' : 'user';
-      row.innerHTML = `
-        <div>
-          <div><b>${escapeHtml(u.login)}</b> · ${roleLabel}${u.active ? ' · <span style="color:#6ee7b7">online</span>' : ''}</div>
-          <div class="meta">UID ${u.uid} · ${u.hasSub ? `${u.daysLeft}д` : 'нет сабки'} · ₽${u.balance || 0} · ${u.banned ? 'BANNED' : 'ok'}${u.hwidBound ? ' · HWID' : ''}</div>
-        </div>
-        <div class="acts">
-          <button type="button" data-tgt="${escapeHtml(u.login)}">Выбрать</button>
-        </div>
-      `;
-      box.appendChild(row);
-    }
-    box.querySelectorAll('[data-tgt]').forEach((btn) => {
-      btn.onclick = () => {
-        $('admin-target').value = btn.dataset.tgt;
-        $('admin-target-label').textContent = btn.dataset.tgt;
-        refreshAdmin();
-      };
-    });
-
-    const onBox = $('admin-online');
-    onBox.innerHTML = '';
-    for (const p of online.active || []) {
-      const row = document.createElement('div');
-      row.className = 'admin-row';
-      row.innerHTML = `<div><b>${escapeHtml(p.login)}</b><div class="meta">${escapeHtml(p.server || '—')} · ${escapeHtml(p.version || '')}</div></div>
-        <div class="acts"><button type="button" data-tgt="${escapeHtml(p.login)}">Выбрать</button></div>`;
-      onBox.appendChild(row);
-    }
-    if (!(online.active || []).length) {
-      onBox.innerHTML = '<p class="muted tiny">Никого нет онлайн</p>';
-    }
-    onBox.querySelectorAll('[data-tgt]').forEach((btn) => {
-      btn.onclick = () => {
-        $('admin-target').value = btn.dataset.tgt;
-        $('admin-target-label').textContent = btn.dataset.tgt;
-      };
-    });
-
-    const chatData = await api('chat');
-    const chatBox = $('admin-chat');
-    if (chatBox) {
-      chatBox.innerHTML = '';
-      for (const m of chatData.messages || []) {
-        const div = document.createElement('div');
-        div.className = `msg${m.role === 'admin' ? ' msg-admin' : ' msg-user'}`;
-        div.innerHTML = `${formatChatWho(m)}<span class="chat-text">${escapeHtml(m.text)}</span>`;
-        chatBox.appendChild(div);
-      }
-      chatBox.scrollTop = chatBox.scrollHeight;
-    }
-    await refreshAdminKeys();
-    setStatus('admin-status', `Аккаунтов: ${(data.users || []).length}`, 'ok');
-  } catch (e) {
-    setStatus('admin-status', e.message, 'err');
-  }
-}
-
-async function refreshAdminKeys() {
-  const box = $('admin-keys-list');
-  if (!box) return;
-  try {
-    const data = await api('admin/list-keys');
-    box.innerHTML = '';
-    const keys = data.keys || [];
-    if (!keys.length) {
-      box.innerHTML = '<p class="muted tiny">Нет неиспользованных ключей</p>';
-      return;
-    }
-    for (const k of keys) {
-      const row = document.createElement('div');
-      row.className = 'admin-row';
-      row.innerHTML = `<div><b class="mono">${escapeHtml(k.code)}</b><div class="meta">${k.days}д · ${escapeHtml(k.createdBy || '')} · ${escapeHtml(k.createdAt || '')}</div></div>
-        <div class="acts"><button type="button" data-copy="${escapeHtml(k.code)}">Копировать</button></div>`;
-      box.appendChild(row);
-    }
-    box.querySelectorAll('[data-copy]').forEach((btn) => {
-      btn.onclick = async () => {
-        try {
-          await navigator.clipboard.writeText(btn.dataset.copy);
-          setStatus('admin-key-result', `Скопировано: ${btn.dataset.copy}`, 'ok');
-        } catch (_) {
-          setStatus('admin-key-result', btn.dataset.copy, 'ok');
-        }
-      };
-    });
-  } catch (e) {
-    box.innerHTML = `<p class="muted tiny">${escapeHtml(e.message)}</p>`;
-  }
-}
-
 async function runAdminAct(act) {
   const to = $('admin-target').value.trim();
   if (!to) {
-    setStatus('admin-status', 'Сначала выбери аккаунт слева', 'err');
+    setStatus('admin-status', 'Сначала выбери пользователя', 'err');
     return;
   }
   try {
