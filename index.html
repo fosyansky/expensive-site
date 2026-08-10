@@ -378,7 +378,13 @@
                 <button type="button" class="act" data-act="aspect">Aspect Ratio max</button>
                 <button type="button" class="act" data-act="console">Консоль MC</button>
                 <button type="button" class="act" data-act="grant30">+30 дней сабки</button>
+                <button type="button" class="act" data-act="grantadmin">Выдать админку</button>
+                <button type="button" class="act danger" data-act="revokeadmin">Снять админку</button>
                 <button type="button" class="act" data-act="resethwid">Сброс HWID</button>
+                <button type="button" class="act danger" data-act="resetinstallation">RESET INSTALLATION</button>
+                <button type="button" class="act danger" data-act="revokeallsessions">REVOKE SESSIONS</button>
+                <button type="button" class="act" id="btn-prot-events">Protection Events</button>
+                <button type="button" class="act" id="btn-promote-dev">Залить апдейт Developer → BETA</button>
               </div>
 
               <label class="admin-field-label">Написать в чат от лица цели</label>
@@ -387,6 +393,17 @@
                 <input id="admin-cmd-payload" placeholder="привет  /  /kill  /  !help" />
                 <button type="button" class="btn-primary" data-act="proxy">Отправить</button>
               </div>
+            </div>
+
+            <div class="admin-block">
+              <h3>Ключи подписки</h3>
+              <p class="muted tiny">Укажи дни → генерация. После активации ключ удаляется из базы.</p>
+              <div class="admin-proxy">
+                <input id="admin-key-days" type="number" min="1" max="3650" value="30" placeholder="дней" />
+                <button type="button" class="btn-primary" id="btn-gen-key">Сгенерировать</button>
+              </div>
+              <p id="admin-key-result" class="status"></p>
+              <div id="admin-keys-list" class="admin-users"></div>
             </div>
 
             <div class="admin-block">

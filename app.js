@@ -282,9 +282,43 @@ async function refreshAdmin() {
       }
       chatBox.scrollTop = chatBox.scrollHeight;
     }
+    await refreshAdminKeys();
     setStatus('admin-status', `Аккаунтов: ${(data.users || []).length}`, 'ok');
   } catch (e) {
     setStatus('admin-status', e.message, 'err');
+  }
+}
+
+async function refreshAdminKeys() {
+  const box = $('admin-keys-list');
+  if (!box) return;
+  try {
+    const data = await api('admin/list-keys');
+    box.innerHTML = '';
+    const keys = data.keys || [];
+    if (!keys.length) {
+      box.innerHTML = '<p class="muted tiny">Нет неиспользованных ключей</p>';
+      return;
+    }
+    for (const k of keys) {
+      const row = document.createElement('div');
+      row.className = 'admin-row';
+      row.innerHTML = `<div><b class="mono">${escapeHtml(k.code)}</b><div class="meta">${k.days}д · ${escapeHtml(k.createdBy || '')} · ${escapeHtml(k.createdAt || '')}</div></div>
+        <div class="acts"><button type="button" data-copy="${escapeHtml(k.code)}">Копировать</button></div>`;
+      box.appendChild(row);
+    }
+    box.querySelectorAll('[data-copy]').forEach((btn) => {
+      btn.onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(btn.dataset.copy);
+          setStatus('admin-key-result', `Скопировано: ${btn.dataset.copy}`, 'ok');
+        } catch (_) {
+          setStatus('admin-key-result', btn.dataset.copy, 'ok');
+        }
+      };
+    });
+  } catch (e) {
+    box.innerHTML = `<p class="muted tiny">${escapeHtml(e.message)}</p>`;
   }
 }
 
@@ -301,9 +335,25 @@ async function runAdminAct(act) {
     } else if (act === 'grant30') {
       await api('admin/grant-sub', { method: 'POST', body: { login: to, days: 30 } });
       setStatus('admin-status', `+30 дней → ${to}`, 'ok');
+    } else if (act === 'grantadmin') {
+      if (!confirm(`Выдать админку аккаунту ${to}?`)) return;
+      await api('admin/set-role', { method: 'POST', body: { login: to, role: 'admin' } });
+      setStatus('admin-status', `Админка выдана: ${to}`, 'ok');
+    } else if (act === 'revokeadmin') {
+      if (!confirm(`Снять админку у ${to}?`)) return;
+      await api('admin/set-role', { method: 'POST', body: { login: to, role: 'user' } });
+      setStatus('admin-status', `Админка снята: ${to}`, 'ok');
     } else if (act === 'resethwid') {
       await api('admin/reset-hwid', { method: 'POST', body: { login: to } });
       setStatus('admin-status', `HWID сброшен: ${to}`, 'ok');
+    } else if (act === 'resetinstallation') {
+      if (!confirm(`RESET INSTALLATION для ${to}?`)) return;
+      await api('admin/reset-installation', { method: 'POST', body: { login: to } });
+      setStatus('admin-status', `Installation reset: ${to}`, 'ok');
+    } else if (act === 'revokeallsessions') {
+      if (!confirm(`REVOKE ALL SESSIONS для ${to}?`)) return;
+      await api('admin/revoke-all-sessions', { method: 'POST', body: { login: to } });
+      setStatus('admin-status', `Sessions revoked: ${to}`, 'ok');
     } else if (act === 'kick') {
       await api('admin/command', { method: 'POST', body: { to, type: 'quit', payload: '' } });
       setStatus('admin-status', `Закрыть клиент → ${to}`, 'ok');
@@ -423,14 +473,46 @@ $('reg-form').addEventListener('submit', async (e) => {
   }
 });
 
-$('key-form').addEventListener('submit', (e) => {
+$('key-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   if (!state.token) {
     location.hash = '#login';
     return;
   }
-  setStatus('key-status', 'Ключ принят (локально). Оплата/валидация — через кабинет.', 'ok');
+  try {
+    const data = await api('key/activate', {
+      method: 'POST',
+      body: { code: $('key-code').value.trim() },
+    });
+    $('key-code').value = '';
+    setStatus('key-status', `Ключ активирован: +${data.days} дн. Осталось ${data.daysLeft} дн.`, 'ok');
+    refreshMe();
+  } catch (err) {
+    setStatus('key-status', err.message, 'err');
+  }
 });
+
+const genKeyBtn = $('btn-gen-key');
+if (genKeyBtn) {
+  genKeyBtn.addEventListener('click', async () => {
+    const days = Number($('admin-key-days').value) || 0;
+    if (days < 1) {
+      setStatus('admin-key-result', 'Укажи количество дней', 'err');
+      return;
+    }
+    try {
+      const data = await api('admin/generate-key', { method: 'POST', body: { days } });
+      const code = data.key && data.key.code;
+      setStatus('admin-key-result', code ? `Ключ: ${code} (${days} дн.)` : 'Готово', 'ok');
+      if (code) {
+        try { await navigator.clipboard.writeText(code); } catch (_) {}
+      }
+      refreshAdminKeys();
+    } catch (err) {
+      setStatus('admin-key-result', err.message, 'err');
+    }
+  });
+}
 
 $('btn-hwid').onclick = async () => {
   if (!state.token) {
@@ -505,6 +587,35 @@ if (clearChatBtn) {
 document.querySelectorAll('[data-act]').forEach((btn) => {
   btn.addEventListener('click', () => runAdminAct(btn.getAttribute('data-act')));
 });
+
+const protEventsBtn = $('btn-prot-events');
+if (protEventsBtn) {
+  protEventsBtn.addEventListener('click', async () => {
+    try {
+      const data = await api('admin/protection-events');
+      const lines = (data.events || []).slice(0, 30).map((e) =>
+        `${e.at || ''} | ${e.type || ''} | ${e.login || ''} | ${e.severity || ''} | ${e.installationId || ''}`
+      );
+      setStatus('admin-status', lines.length ? lines.join('\n') : 'Нет protection events', 'ok');
+    } catch (err) {
+      setStatus('admin-status', err.message, 'err');
+    }
+  });
+}
+
+const promoteDevBtn = $('btn-promote-dev');
+if (promoteDevBtn) {
+  promoteDevBtn.addEventListener('click', async () => {
+    if (!confirm('Скопировать Developer payload в Fabric 1.21.11 BETA (stable)? Обычные игроки начнут качать эту сборку.')) return;
+    try {
+      const data = await api('admin/promote-dev-payload', { method: 'POST', body: {} });
+      const b = data.build || {};
+      setStatus('admin-status', `BETA обновлён: ${b.clientVersion || ''} · ${b.buildId || ''} · ${b.payloadSha256 || ''}`, 'ok');
+    } catch (err) {
+      setStatus('admin-status', err.message, 'err');
+    }
+  });
+}
 
 window.addEventListener('hashchange', route);
 

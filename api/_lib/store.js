@@ -15,6 +15,7 @@ function emptyDb() {
     sessions: {},
     parties: {},
     messages: {},
+    subKeys: [],
   };
 }
 
