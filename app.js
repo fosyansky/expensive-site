@@ -606,7 +606,7 @@ if (protEventsBtn) {
 const promoteDevBtn = $('btn-promote-dev');
 if (promoteDevBtn) {
   promoteDevBtn.addEventListener('click', async () => {
-    if (!confirm('Скопировать Developer payload в Fabric 1.21.11 BETA (stable)? Обычные игроки начнут качать эту сборку.')) return;
+    if (!confirm('Залить текущий Developer payload в публичную Fabric 1.21.11 BETA?\n\nОбычные игроки начнут качать эту сборку.')) return;
     try {
       const data = await api('admin/promote-dev-payload', { method: 'POST', body: {} });
       const b = data.build || {};
